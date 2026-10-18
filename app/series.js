@@ -343,6 +343,12 @@
     true,
   );
   window.seriesPanel = {
+    dismiss: function () {
+      active = false;
+      returnPending = false;
+      ++serial;
+      el("series-panel").classList.add("hidden");
+    },
     open: open,
     restore: restore,
     isActive: function () {
