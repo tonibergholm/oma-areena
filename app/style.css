@@ -516,7 +516,7 @@ nav .nav-selected {
   bottom: 70px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 90px;
+  padding: 8px 90px 16px;
 }
 #home {
   width: 1920px;
@@ -530,6 +530,8 @@ nav .nav-selected {
   padding: 20px 90px;
 }
 .home-row {
+  display: flex;
+  flex-direction: column;
   margin-bottom: 22px;
 }
 .home-row h2 {
@@ -540,8 +542,12 @@ nav .nav-selected {
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 5px 4px 12px;
+  padding: 8px 8px 14px;
   scrollbar-width: none;
+}
+.home-cards::after {
+  content: "";
+  flex: 0 0 16px;
 }
 .home-cards .card {
   width: 420px;

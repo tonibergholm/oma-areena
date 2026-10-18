@@ -22,6 +22,27 @@
   function item() {
     return rows[row] && rows[row].items[column];
   }
+  function reveal(section, card) {
+    // Scroll each container explicitly: scrolling only the card can clip its row heading.
+    var shelf = el("home-shelves"),
+      viewport = shelf.getBoundingClientRect(),
+      bounds = section.getBoundingClientRect(),
+      padding = 8;
+    if (
+      bounds.height > viewport.height - padding * 2 ||
+      bounds.top < viewport.top + padding
+    )
+      shelf.scrollTop += bounds.top - viewport.top - padding;
+    else if (bounds.bottom > viewport.bottom - padding)
+      shelf.scrollTop += bounds.bottom - viewport.bottom + padding;
+    var rail = card.parentNode,
+      frame = rail.getBoundingClientRect(),
+      target = card.getBoundingClientRect();
+    if (target.left < frame.left + padding)
+      rail.scrollLeft += target.left - frame.left - padding;
+    else if (target.right > frame.right - padding)
+      rail.scrollLeft += target.right - frame.right + padding;
+  }
   function actions() {
     return actionIds.filter(function (id) {
       return !el(id).classList.contains("hidden");
@@ -173,7 +194,7 @@
               ri === row && ci === column && focus === "cards",
             );
             if (ri === row && ci === column && focus === "cards")
-              card.scrollIntoView({ block: "nearest", inline: "nearest" });
+              reveal(section, card);
           },
         );
       },

@@ -29,7 +29,7 @@ const playing = () =>
     (v) => v.state === "PLAYING" && v.time > 1000,
   );
 try {
-  assert.equal(await ev("pocState.version"), "0.3.5");
+  assert.equal(await ev("pocState.version"), "0.3.6");
   await ev(
     `areenaLibrary.intro('1-3822119',null);openAreenaProgram('1-41272',{restart:true});true`,
   );
@@ -88,7 +88,7 @@ try {
   await key(10009);
   await ev(`setTimeout(()=>location.reload(),300);true`);
   await delay(1100);
-  await until(`pocState.version`, (v) => v === "0.3.5");
+  await until(`pocState.version`, (v) => v === "0.3.6");
   assert.deepEqual(await ev(`areenaLibrary.intro('1-3822119')`), range);
   pass("Intro timing survives app reload", { ok: true });
   await ev(`openAreenaProgram('1-41272',{restart:true});true`);
