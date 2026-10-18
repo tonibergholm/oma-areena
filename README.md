@@ -2,13 +2,17 @@
 
 An unofficial, GPL-3.0-or-later TV client for Yle Areena. Built for and tested on a Samsung QE55QN85AATXXH running Tizen 6.0, firmware T-NKM2DEUC-2301.1. This project is not affiliated with Yle.
 
-The current PoC features the supplied Elämäni Biisi and Kovan viikon ilta episodes and Pasila, with artwork, descriptions, native Samsung AVPlay HLS playback, local resume positions, subtitle controls, and a bounded next-episode browser (up to 12 episodes). It is not a full Areena catalogue or account client.
+Version 0.2.0 adds live category browsing and programme search across Areena, including a Finnish on-screen keyboard with digits and paged results. The original Elämäni Biisi, Kovan viikon ilta and Pasila shortcuts remain on the home screen. Playback uses native Samsung AVPlay with local resume, subtitles and automatic next episode. There is no Yle account integration; series results open the default episode selected by Yle. Full season selection remains future work.
 
 ## Use on the TV
 
 Open **Oma Areena** in Apps. No computer or companion server is needed for normal use.
 
-- Left/right: choose a programme. OK: play or resume.
+- Left/right: choose a home programme. OK: play or resume.
+- Press Up twice to reach the header, then choose **Selaa** or **Hae**.
+- In **Selaa**, left/right selects a category; OK loads it. Navigate result cards with arrows and use the page buttons below the grid for more results.
+- In **Hae**, use the on-screen Finnish keyboard, then select **Hae**. A physical keyboard also supports text entry and Enter to search.
+- OK plays a search/category result. Back from playback restores the result list. Back again returns to category selection or editing the search.
 - Up: focus Play / Start over; left/right selects the action, OK activates it.
 - Down: browse available following episodes. Up/down selects; OK plays.
 - During playback: OK toggles pause, left/right seeks 10 seconds, Down toggles subtitles, Back returns home.
@@ -46,4 +50,14 @@ Version 0.1.4 passed 16 on-device checks, recorded locally in an unpublished ver
 
 ## Development inspector
 
-`inspect.mjs` and `verify-tv.mjs` expect the app's developer inspector forwarded to `127.0.0.1:9223`. They require a recent Node.js with built-in WebSocket support. `verify-tv.mjs` drives the actual installed app and writes local diagnostics under ignored `data/`.
+`inspect.mjs`, `verify-tv.mjs` and `verify-browse-tv.mjs` expect the app's developer inspector forwarded to `127.0.0.1:9223`. They require a recent Node.js with built-in WebSocket support. `verify-tv.mjs` drives the actual installed app and writes local diagnostics under ignored `data/`.
+
+## Catalogue data and tests
+
+Category sources are discovered from the current Areena home page rather than storing expiring list tokens in the app. Search and category pages request 12 cards at a time, using the response count to determine whether a next page exists. Empty results and network failures have separate recovery messages. Native temporary files are cleaned after reading. The catalogue UI uses explicit overlay positions for the TV’s older Chromium engine.
+
+Run the dependency-free data-layer tests with `node tests/catalogue.test.mjs`. The on-device browse verifier uses the actual remote-key handler and native Yle requests; run `node verify-browse-tv.mjs` after forwarding the developer inspector.
+
+### Version 0.2.0 validation
+
+Five data-adapter tests cover fresh category discovery, Finnish query encoding and paging, empty queries, network failures and series resolution. On the Samsung TV, acceptance checks cover live categories, result paging, keyboard input, Finnish characters and digits, search playback, returning to results and an empty-result recovery path. The existing playback, subtitles, seek/resume and automatic-next-episode regression checks also pass. Local reports remain excluded from Git.

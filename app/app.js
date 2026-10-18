@@ -1,24 +1,492 @@
 /* Oma Areena PoC — GPL-3.0-or-later */
-(function(){'use strict';
-var catalog=[],selected=0,episodeIndex=0,episodes=[],mode='home',actionIndex=0,current=null,av=null,clock=0,hideTimer=null,subtitleTimer=null,subs=true,loadSerial=0;
-function el(id){return document.getElementById(id);}function text(id,value){el(id).textContent=value||'';}
-function request(path,method,data){return window.areenaRequest(path,method,data);}
-function event(name,data){request('/api/event','POST',{event:name,data:data||{},at:Date.now()}).catch(function(){});}
-function saved(id){try{return JSON.parse(localStorage.getItem('progress:'+id)||'0');}catch(e){return 0;}}
-function save(){if(av)try{if(av.getState()==='PLAYING'||av.getState()==='PAUSED')clock=av.getCurrentTime();}catch(e){}if(current&&clock>0)try{localStorage.setItem('progress:'+current.id,JSON.stringify(clock));}catch(e){}}
-function fmt(ms){var s=Math.floor(ms/1000);return Math.floor(s/3600)?Math.floor(s/3600)+':'+('0'+Math.floor(s/60)%60).slice(-2)+':'+('0'+s%60).slice(-2):Math.floor(s/60)+':'+('0'+s%60).slice(-2);}
-function notice(s){text('notice',s);el('notice').classList.remove('hidden');setTimeout(function(){el('notice').classList.add('hidden');},7000);}
-function render(){el('play').classList.remove('action-selected');el('restart').classList.remove('action-selected');var cards=el('cards');cards.textContent='';catalog.forEach(function(p,i){var c=document.createElement('div');c.className='card'+(i===selected?' selected':'');var img=document.createElement('img');img.src=p.image;img.alt='';c.appendChild(img);var l=document.createElement('div');l.className='label';var h=document.createElement('h3');h.textContent=p.series;var d=document.createElement('p');d.textContent=p.episode+' · '+Math.round(p.duration/60)+' min';l.appendChild(h);l.appendChild(d);c.appendChild(l);var bar=document.createElement('div');bar.className='resume';bar.style.width=Math.min(100,saved(p.id)/(p.duration*1000)*100)+'%';c.appendChild(bar);c.onclick=function(){selected=i;render();start(p.id,false);};cards.appendChild(c);});var p=catalog[selected];if(!p)return;text('series',p.series);text('meta',p.episode+'  ·  '+Math.round(p.duration/60)+' min');text('description',p.description);el('hero').style.backgroundImage='url("'+p.image+'")';text('play',saved(p.id)>10000?'▶ Jatka '+fmt(saved(p.id)):'▶ Katso');}
-function hud(s){if(s!==undefined)text('player-status',s);el('hud').classList.remove('hidden');clearTimeout(hideTimer);hideTimer=setTimeout(function(){if(mode==='player'&&av&&av.getState()==='PLAYING')el('hud').classList.add('hidden');},5000);}
-function fail(e){event('error',{message:String(e),program:current&&current.id});stop();notice('Toisto ei onnistunut: '+(e.message||e));}
-function stop(){++loadSerial;save();clearTimeout(hideTimer);clearTimeout(subtitleTimer);if(av)try{av.stop();av.close();}catch(e){}el('subtitle').textContent='';el('hud').classList.add('hidden');document.body.classList.remove('playing');el('home').classList.remove('hidden');mode='home';clock=0;render();}
-function start(id,fromStart){stop();var serial=loadSerial;mode='loading';notice('Avataan ohjelmaa…');request('/api/program/'+id).then(function(p){if(serial!==loadSerial)return;current=p;clock=fromStart?0:saved(id);var resumePosition=clock;event('open',{program:id,resume:clock});if(!window.webapis||!webapis.avplay)throw Error('Samsung AVPlay ei ole käytettävissä tässä selaimessa');av=webapis.avplay;el('notice').classList.add('hidden');el('home').classList.add('hidden');el('episodes').classList.add('hidden');document.body.classList.add('playing');text('playing-title',p.series+' — '+p.episode);mode='player';hud('Ladataan…');av.open(p.manifest);try{av.setStreamingProperty('ADAPTIVE_INFO','STARTBITRATE=HIGHEST|SKIPBITRATE=HIGHEST');}catch(e){event('adaptive-setting',{message:String(e)});}av.setDisplayRect(0,0,1920,1080);av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');av.setListener({onbufferingstart:function(){hud('Puskurointi…');event('buffering',{program:id});},onbufferingcomplete:function(){hud('');},oncurrentplaytime:function(ms){clock=ms;text('time',fmt(ms)+' / '+fmt(p.duration*1000));el('progress').style.width=Math.min(100,ms/(p.duration*1000)*100)+'%';if(Math.floor(ms/1000)%5===0)save();},onstreamcompleted:function(){localStorage.removeItem('progress:'+id);clock=0;event('ended',{program:id});if(p.next)start(p.next,false);else stop();},onerror:function(err){fail(Error(err));},onsubtitlechange:function(duration,s){clearTimeout(subtitleTimer);text('subtitle',subs?String(s).replace(/\u0000/g,'').replace(/<br\s*\/?\s*>/gi,'\n').replace(/<[^>]*>/g,''):'');subtitleTimer=setTimeout(function(){text('subtitle','');},duration);}});av.prepareAsync(function(){try{var resume=resumePosition;av.play();if(resume>10000&&resume<p.duration*1000-10000)av.seekTo(resume);var tracks=av.getTotalTrackInfo();event('prepared',{program:id,duration:av.getDuration(),tracks:tracks});var sub=tracks.filter(function(t){return t.type==='TEXT';})[0];if(sub)av.setSelectTrack('TEXT',sub.index);hud('');setTimeout(function(){if(mode==='player')event('playback-check',{program:id,state:av.getState(),time:av.getCurrentTime()});},10000);}catch(e){fail(e);}},function(e){fail(e);});}).catch(fail);}
-function toggle(){if(!av)return;try{if(av.getState()==='PLAYING'){clock=av.getCurrentTime();av.pause();hud('Tauko');event('pause',{program:current.id,time:clock});}else if(av.getState()==='PAUSED'){av.play();hud('');event('resume',{program:current.id,time:clock});}}catch(e){notice(String(e));}}
-function seek(delta){try{var dest=Math.max(0,Math.min(av.getDuration()-1000,av.getCurrentTime()+delta));av.seekTo(dest,function(){clock=dest;save();hud('');event('seek',{program:current.id,time:dest});},function(e){notice(String(e));});hud(delta>0?'+10 sekuntia':'−10 sekuntia');}catch(e){notice(String(e));}}
-function showEpisodes(){mode='episodes';episodeIndex=0;el('episodes').classList.remove('hidden');text('episode-heading',catalog[selected].series+' · Jaksot');el('episode-list').textContent='Ladataan…';request('/api/episodes/'+catalog[selected].id).then(function(items){episodes=items;drawEpisodes();}).catch(function(e){notice(e.message);mode='home';el('episodes').classList.add('hidden');});}
-function drawEpisodes(){var list=el('episode-list');list.textContent='';episodes.forEach(function(p,i){var b=document.createElement('button');b.className='episode'+(i===episodeIndex?' selected':'');b.textContent=p.episode+' · '+Math.round(p.duration/60)+' min';b.onclick=function(){start(p.id,false);};list.appendChild(b);if(i===episodeIndex)b.scrollIntoView({block:'nearest'});});}
-document.addEventListener('keydown',function(e){var k=e.keyCode;if([13,27,37,38,39,40,10009,415,19,10252,413,417,412].indexOf(k)<0)return;e.preventDefault();event('key',{key:k,mode:mode});if(mode==='player'){if(k===10009||k===27||k===413)stop();else if(k===13||k===10252||k===415||k===19)toggle();else if(k===37||k===412)seek(-10000);else if(k===39||k===417)seek(10000);else if(k===40){subs=!subs;try{av.setSilentSubtitle(!subs);}catch(e){}if(!subs)text('subtitle','');hud(subs?'Tekstitys päällä':'Tekstitys pois');}else hud();return;}if(mode==='loading'){if(k===10009||k===27)stop();return;}if(mode==='actions'){if(k===40||k===10009||k===27){mode='home';render();}else if(k===37||k===39){actionIndex=1-actionIndex;el('play').classList.toggle('action-selected',actionIndex===0);el('restart').classList.toggle('action-selected',actionIndex===1);}else if(k===13)start(catalog[selected].id,actionIndex===1);return;}if(mode==='episodes'){if(k===10009||k===27||(k===38&&episodeIndex===0)){mode='home';el('episodes').classList.add('hidden');}else if(k===38){episodeIndex=Math.max(0,episodeIndex-1);drawEpisodes();}else if(k===40){episodeIndex=Math.min(episodes.length-1,episodeIndex+1);drawEpisodes();}else if(k===13&&episodes[episodeIndex])start(episodes[episodeIndex].id,false);return;}if(k===37||k===39){selected=(selected+(k===37?-1:1)+catalog.length)%catalog.length;render();}else if(k===13&&catalog[selected])start(catalog[selected].id,false);else if(k===38&&catalog[selected]){mode='actions';actionIndex=0;el('play').classList.add('action-selected');}else if(k===40&&catalog[selected])showEpisodes();else if(k===10009||k===27){try{tizen.application.getCurrentApplication().exit();}catch(e){}}});
-el('play').onclick=function(){start(catalog[selected].id,false);};el('restart').onclick=function(){start(catalog[selected].id,true);};document.addEventListener('visibilitychange',function(){if(document.hidden&&mode==='player'){save();try{av.pause();}catch(e){}}});window.addEventListener('beforeunload',save);window.addEventListener('error',function(e){event('js-error',{message:e.message,line:e.lineno});});
-try{['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaRewind','MediaFastForward'].forEach(function(k){tizen.tvinputdevice.registerKey(k);});}catch(e){}
-event('boot',{userAgent:navigator.userAgent,avplay:!!(window.webapis&&webapis.avplay)});request('/api/catalog').then(function(d){catalog=d;render();text('connection','Suoraan Ylestä · Oma Areena 0.1.4');event('catalog-loaded',{count:d.length});}).catch(function(e){text('description','Ohjelmatietoja ei saatu Ylestä. Sulje sovellus ja yritä uudelleen.');text('connection','Palvelin ei vastaa');notice(e.message);});
+(function () {
+  "use strict";
+  var catalog = [],
+    selected = 0,
+    episodeIndex = 0,
+    episodes = [],
+    mode = "home",
+    actionIndex = 0,
+    navIndex = 0,
+    current = null,
+    av = null,
+    clock = 0,
+    hideTimer = null,
+    subtitleTimer = null,
+    subs = true,
+    loadSerial = 0;
+  function el(id) {
+    return document.getElementById(id);
+  }
+  function text(id, value) {
+    el(id).textContent = value || "";
+  }
+  function request(path, method, data) {
+    return window.areenaRequest(path, method, data);
+  }
+  function event(name, data) {
+    request("/api/event", "POST", {
+      event: name,
+      data: data || {},
+      at: Date.now(),
+    }).catch(function () {});
+  }
+  function saved(id) {
+    try {
+      return JSON.parse(localStorage.getItem("progress:" + id) || "0");
+    } catch (e) {
+      return 0;
+    }
+  }
+  function save() {
+    if (av)
+      try {
+        if (av.getState() === "PLAYING" || av.getState() === "PAUSED")
+          clock = av.getCurrentTime();
+      } catch (e) {}
+    if (current && clock > 0)
+      try {
+        localStorage.setItem("progress:" + current.id, JSON.stringify(clock));
+      } catch (e) {}
+  }
+  function fmt(ms) {
+    var s = Math.floor(ms / 1000);
+    return Math.floor(s / 3600)
+      ? Math.floor(s / 3600) +
+          ":" +
+          ("0" + (Math.floor(s / 60) % 60)).slice(-2) +
+          ":" +
+          ("0" + (s % 60)).slice(-2)
+      : Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+  function notice(s) {
+    text("notice", s);
+    el("notice").classList.remove("hidden");
+    setTimeout(function () {
+      el("notice").classList.add("hidden");
+    }, 7000);
+  }
+  function paintNav() {
+    ["nav-home", "nav-browse", "nav-search"].forEach(function (id, i) {
+      el(id).classList.toggle("nav-selected", mode === "nav" && i === navIndex);
+    });
+  }
+  function render() {
+    el("play").classList.remove("action-selected");
+    el("restart").classList.remove("action-selected");
+    var cards = el("cards");
+    cards.textContent = "";
+    catalog.forEach(function (p, i) {
+      var c = document.createElement("div");
+      c.className = "card" + (i === selected ? " selected" : "");
+      var img = document.createElement("img");
+      img.src = p.image;
+      img.alt = "";
+      c.appendChild(img);
+      var l = document.createElement("div");
+      l.className = "label";
+      var h = document.createElement("h3");
+      h.textContent = p.series;
+      var d = document.createElement("p");
+      d.textContent = p.episode + " · " + Math.round(p.duration / 60) + " min";
+      l.appendChild(h);
+      l.appendChild(d);
+      c.appendChild(l);
+      var bar = document.createElement("div");
+      bar.className = "resume";
+      bar.style.width =
+        Math.min(100, (saved(p.id) / (p.duration * 1000)) * 100) + "%";
+      c.appendChild(bar);
+      c.onclick = function () {
+        selected = i;
+        render();
+        start(p.id, false);
+      };
+      cards.appendChild(c);
+    });
+    var p = catalog[selected];
+    if (!p) return;
+    text("series", p.series);
+    text("meta", p.episode + "  ·  " + Math.round(p.duration / 60) + " min");
+    text("description", p.description);
+    el("hero").style.backgroundImage = 'url("' + p.image + '")';
+    text(
+      "play",
+      saved(p.id) > 10000 ? "▶ Jatka " + fmt(saved(p.id)) : "▶ Katso",
+    );
+  }
+  function hud(s) {
+    if (s !== undefined) text("player-status", s);
+    el("hud").classList.remove("hidden");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      if (mode === "player" && av && av.getState() === "PLAYING")
+        el("hud").classList.add("hidden");
+    }, 5000);
+  }
+  function fail(e) {
+    event("error", { message: String(e), program: current && current.id });
+    stop();
+    if (window.catalogBrowser) window.catalogBrowser.restore();
+    notice("Toisto ei onnistunut: " + (e.message || e));
+  }
+  function stop() {
+    ++loadSerial;
+    save();
+    clearTimeout(hideTimer);
+    clearTimeout(subtitleTimer);
+    if (av)
+      try {
+        av.stop();
+        av.close();
+      } catch (e) {}
+    el("subtitle").textContent = "";
+    el("hud").classList.add("hidden");
+    document.body.classList.remove("playing");
+    el("home").classList.remove("hidden");
+    mode = "home";
+    clock = 0;
+    render();
+  }
+  function start(id, fromStart) {
+    stop();
+    var serial = loadSerial;
+    mode = "loading";
+    notice("Avataan ohjelmaa…");
+    request("/api/program/" + id)
+      .then(function (p) {
+        if (serial !== loadSerial) return;
+        current = p;
+        id = p.id;
+        clock = fromStart ? 0 : saved(id);
+        var resumePosition = clock;
+        event("open", { program: id, resume: clock });
+        if (!window.webapis || !webapis.avplay)
+          throw Error("Samsung AVPlay ei ole käytettävissä tässä selaimessa");
+        av = webapis.avplay;
+        el("notice").classList.add("hidden");
+        el("home").classList.add("hidden");
+        el("episodes").classList.add("hidden");
+        document.body.classList.add("playing");
+        text("playing-title", p.series + " — " + p.episode);
+        mode = "player";
+        hud("Ladataan…");
+        av.open(p.manifest);
+        try {
+          av.setStreamingProperty(
+            "ADAPTIVE_INFO",
+            "STARTBITRATE=HIGHEST|SKIPBITRATE=HIGHEST",
+          );
+        } catch (e) {
+          event("adaptive-setting", { message: String(e) });
+        }
+        av.setDisplayRect(0, 0, 1920, 1080);
+        av.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX");
+        av.setListener({
+          onbufferingstart: function () {
+            hud("Puskurointi…");
+            event("buffering", { program: id });
+          },
+          onbufferingcomplete: function () {
+            hud("");
+          },
+          oncurrentplaytime: function (ms) {
+            clock = ms;
+            text("time", fmt(ms) + " / " + fmt(p.duration * 1000));
+            el("progress").style.width =
+              Math.min(100, (ms / (p.duration * 1000)) * 100) + "%";
+            if (Math.floor(ms / 1000) % 5 === 0) save();
+          },
+          onstreamcompleted: function () {
+            localStorage.removeItem("progress:" + id);
+            clock = 0;
+            event("ended", { program: id });
+            if (p.next) start(p.next, false);
+            else stop();
+          },
+          onerror: function (err) {
+            fail(Error(err));
+          },
+          onsubtitlechange: function (duration, s) {
+            clearTimeout(subtitleTimer);
+            text(
+              "subtitle",
+              subs
+                ? String(s)
+                    .replace(/\u0000/g, "")
+                    .replace(/<br\s*\/?\s*>/gi, "\n")
+                    .replace(/<[^>]*>/g, "")
+                : "",
+            );
+            subtitleTimer = setTimeout(function () {
+              text("subtitle", "");
+            }, duration);
+          },
+        });
+        av.prepareAsync(
+          function () {
+            try {
+              var resume = resumePosition;
+              av.play();
+              if (resume > 10000 && resume < p.duration * 1000 - 10000)
+                av.seekTo(resume);
+              var tracks = av.getTotalTrackInfo();
+              event("prepared", {
+                program: id,
+                duration: av.getDuration(),
+                tracks: tracks,
+              });
+              var sub = tracks.filter(function (t) {
+                return t.type === "TEXT";
+              })[0];
+              if (sub) av.setSelectTrack("TEXT", sub.index);
+              hud("");
+              setTimeout(function () {
+                if (mode === "player")
+                  event("playback-check", {
+                    program: id,
+                    state: av.getState(),
+                    time: av.getCurrentTime(),
+                  });
+              }, 10000);
+            } catch (e) {
+              fail(e);
+            }
+          },
+          function (e) {
+            fail(e);
+          },
+        );
+      })
+      .catch(function (e) {
+        if (serial === loadSerial) fail(e);
+      });
+  }
+  function toggle() {
+    if (!av) return;
+    try {
+      if (av.getState() === "PLAYING") {
+        clock = av.getCurrentTime();
+        av.pause();
+        hud("Tauko");
+        event("pause", { program: current.id, time: clock });
+      } else if (av.getState() === "PAUSED") {
+        av.play();
+        hud("");
+        event("resume", { program: current.id, time: clock });
+      }
+    } catch (e) {
+      notice(String(e));
+    }
+  }
+  function seek(delta) {
+    try {
+      var dest = Math.max(
+        0,
+        Math.min(av.getDuration() - 1000, av.getCurrentTime() + delta),
+      );
+      av.seekTo(
+        dest,
+        function () {
+          clock = dest;
+          save();
+          hud("");
+          event("seek", { program: current.id, time: dest });
+        },
+        function (e) {
+          notice(String(e));
+        },
+      );
+      hud(delta > 0 ? "+10 sekuntia" : "−10 sekuntia");
+    } catch (e) {
+      notice(String(e));
+    }
+  }
+  function showEpisodes() {
+    mode = "episodes";
+    episodeIndex = 0;
+    el("episodes").classList.remove("hidden");
+    text("episode-heading", catalog[selected].series + " · Jaksot");
+    el("episode-list").textContent = "Ladataan…";
+    request("/api/episodes/" + catalog[selected].id)
+      .then(function (items) {
+        episodes = items;
+        drawEpisodes();
+      })
+      .catch(function (e) {
+        notice(e.message);
+        mode = "home";
+        el("episodes").classList.add("hidden");
+      });
+  }
+  function drawEpisodes() {
+    var list = el("episode-list");
+    list.textContent = "";
+    episodes.forEach(function (p, i) {
+      var b = document.createElement("button");
+      b.className = "episode" + (i === episodeIndex ? " selected" : "");
+      b.textContent = p.episode + " · " + Math.round(p.duration / 60) + " min";
+      b.onclick = function () {
+        start(p.id, false);
+      };
+      list.appendChild(b);
+      if (i === episodeIndex) b.scrollIntoView({ block: "nearest" });
+    });
+  }
+  document.addEventListener("keydown", function (e) {
+    var k = e.keyCode;
+    if (
+      [13, 27, 37, 38, 39, 40, 10009, 415, 19, 10252, 413, 417, 412].indexOf(
+        k,
+      ) < 0
+    )
+      return;
+    e.preventDefault();
+    event("key", { key: k, mode: mode });
+    if (mode === "player") {
+      if (k === 10009 || k === 27 || k === 413) {
+        stop();
+        if (window.catalogBrowser) window.catalogBrowser.restore();
+      } else if (k === 13 || k === 10252 || k === 415 || k === 19) toggle();
+      else if (k === 37 || k === 412) seek(-10000);
+      else if (k === 39 || k === 417) seek(10000);
+      else if (k === 40) {
+        subs = !subs;
+        try {
+          av.setSilentSubtitle(!subs);
+        } catch (e) {}
+        if (!subs) text("subtitle", "");
+        hud(subs ? "Tekstitys päällä" : "Tekstitys pois");
+      } else hud();
+      return;
+    }
+    if (mode === "loading") {
+      if (k === 10009 || k === 27) stop();
+      return;
+    }
+    if (mode === "nav") {
+      if (k === 37 || k === 39) {
+        navIndex = (navIndex + (k === 37 ? -1 : 1) + 3) % 3;
+        paintNav();
+      } else if (k === 40 || k === 10009 || k === 27) {
+        mode = "home";
+        paintNav();
+      } else if (k === 13) {
+        mode = "home";
+        paintNav();
+        if (navIndex && window.catalogBrowser)
+          window.catalogBrowser.open(navIndex === 1 ? "browse" : "search");
+      }
+      return;
+    }
+    if (mode === "actions") {
+      if (k === 38) {
+        mode = "nav";
+        navIndex = 1;
+        el("play").classList.remove("action-selected");
+        el("restart").classList.remove("action-selected");
+        paintNav();
+      } else if (k === 40 || k === 10009 || k === 27) {
+        mode = "home";
+        render();
+      } else if (k === 37 || k === 39) {
+        actionIndex = 1 - actionIndex;
+        el("play").classList.toggle("action-selected", actionIndex === 0);
+        el("restart").classList.toggle("action-selected", actionIndex === 1);
+      } else if (k === 13) start(catalog[selected].id, actionIndex === 1);
+      return;
+    }
+    if (mode === "episodes") {
+      if (k === 10009 || k === 27 || (k === 38 && episodeIndex === 0)) {
+        mode = "home";
+        el("episodes").classList.add("hidden");
+      } else if (k === 38) {
+        episodeIndex = Math.max(0, episodeIndex - 1);
+        drawEpisodes();
+      } else if (k === 40) {
+        episodeIndex = Math.min(episodes.length - 1, episodeIndex + 1);
+        drawEpisodes();
+      } else if (k === 13 && episodes[episodeIndex])
+        start(episodes[episodeIndex].id, false);
+      return;
+    }
+    if (k === 37 || k === 39) {
+      selected =
+        (selected + (k === 37 ? -1 : 1) + catalog.length) % catalog.length;
+      render();
+    } else if (k === 13 && catalog[selected])
+      start(catalog[selected].id, false);
+    else if (k === 38 && catalog[selected]) {
+      mode = "actions";
+      actionIndex = 0;
+      el("play").classList.add("action-selected");
+    } else if (k === 40 && catalog[selected]) showEpisodes();
+    else if (k === 10009 || k === 27) {
+      try {
+        tizen.application.getCurrentApplication().exit();
+      } catch (e) {}
+    }
+  });
+  window.openAreenaProgram = function (id) {
+    start(id, false);
+  };
+  el("nav-home").onclick = function () {
+    mode = "home";
+    paintNav();
+  };
+  el("nav-browse").onclick = function () {
+    if (window.catalogBrowser) window.catalogBrowser.open("browse");
+  };
+  el("nav-search").onclick = function () {
+    if (window.catalogBrowser) window.catalogBrowser.open("search");
+  };
+  el("play").onclick = function () {
+    start(catalog[selected].id, false);
+  };
+  el("restart").onclick = function () {
+    start(catalog[selected].id, true);
+  };
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && mode === "player") {
+      save();
+      try {
+        av.pause();
+      } catch (e) {}
+    }
+  });
+  window.addEventListener("beforeunload", save);
+  window.addEventListener("error", function (e) {
+    event("js-error", { message: e.message, line: e.lineno });
+  });
+  try {
+    [
+      "MediaPlayPause",
+      "MediaPlay",
+      "MediaPause",
+      "MediaStop",
+      "MediaRewind",
+      "MediaFastForward",
+    ].forEach(function (k) {
+      tizen.tvinputdevice.registerKey(k);
+    });
+  } catch (e) {}
+  event("boot", {
+    userAgent: navigator.userAgent,
+    avplay: !!(window.webapis && webapis.avplay),
+  });
+  request("/api/catalog")
+    .then(function (d) {
+      catalog = d;
+      render();
+      text("connection", "Suoraan Ylestä · Oma Areena 0.2.0");
+      event("catalog-loaded", { count: d.length });
+    })
+    .catch(function (e) {
+      text(
+        "description",
+        "Ohjelmatietoja ei saatu Ylestä. Sulje sovellus ja yritä uudelleen.",
+      );
+      text("connection", "Palvelin ei vastaa");
+      notice(e.message);
+    });
 })();

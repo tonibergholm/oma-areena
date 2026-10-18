@@ -7,12 +7,12 @@ async function evaluate(expression){const id=++seq;const result=await new Promis
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const key=k=>evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:${k},which:${k},bubbles:true}));true`);
 async function until(expr,pred,timeout=20000){const start=Date.now();let v;do{v=await evaluate(`(()=>{try{return (${expr});}catch(e){return null;}})()`);if(v!==null&&pred(v))return v;await delay(400);}while(Date.now()-start<timeout);throw Error('Condition failed: '+expr+' value '+JSON.stringify(v));}
-const report={version:'0.1.4',device:'QE55QN85AATXXH / Tizen 6.0',started:new Date().toISOString(),checks:[]};
+const report={version:'0.2.0',device:'QE55QN85AATXXH / Tizen 6.0',started:new Date().toISOString(),checks:[]};
 const pass=(name,evidence)=>{report.checks.push({name,evidence});console.log('PASS',name,JSON.stringify(evidence));};
 try{
  await evaluate(`if(document.body.classList.contains('playing')||!document.getElementById('episodes').classList.contains('hidden'))document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:10009,which:10009,bubbles:true}));true`);
  const initial=await until(`({version:window.pocState&&pocState.version,cards:document.querySelectorAll('.card').length,loaded:Array.from(document.images).every(i=>i.complete&&i.naturalWidth>0),events:window.pocEvents})`,v=>v.cards===3&&v.loaded);
- assert.equal(initial.version,'0.1.4');pass('Standalone catalogue and artwork',{version:initial.version,cards:initial.cards,imagesLoaded:initial.loaded});
+ assert.equal(initial.version,'0.2.0');pass('Standalone catalogue and artwork',{version:initial.version,cards:initial.cards,imagesLoaded:initial.loaded});
  for(const title of ['Elämäni Biisi','Kovan viikon ilta','Pasila']){
   for(let i=0;i<3;i++){if(await evaluate(`document.querySelector('.card.selected h3').textContent`)===title)break;await key(39);}
   assert.equal(await evaluate(`document.querySelector('.card.selected h3').textContent`),title);
