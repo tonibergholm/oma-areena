@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {connect,delay} from './tv-client.mjs';
 const tv=await connect();
 const {evaluate:ev,until,key}=tv;
-const report={version:'0.3.6',checks:[]};
+const report={version:'0.3.7',checks:[]};
 const pass=(name,evidence)=>{report.checks.push({name,evidence});console.log('PASS',name,JSON.stringify(evidence));};
 const playing=()=>until(`({state:webapis.avplay.getState(),time:webapis.avplay.getCurrentTime(),title:document.getElementById('playing-title').textContent})`,v=>v.state==='PLAYING'&&v.time>1000);
 try{
  await until(`pocEvents.some(e=>e.event==='library-migrated')`,Boolean);
- assert.equal(await ev('pocState.version'),'0.3.6');
+ assert.equal(await ev('pocState.version'),'0.3.7');
  pass('Existing viewing history migrated',{entries:await ev('areenaLibrary.continuing().length')});
  await ev(`seriesPanel.open('1-3822119',{isSeries:true});true`);
  const seasons=await until(`Array.from(document.querySelectorAll('#season-tabs button')).map(b=>b.textContent)`,v=>v.length===6);

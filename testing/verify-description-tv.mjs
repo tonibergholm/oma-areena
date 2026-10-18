@@ -9,7 +9,7 @@ const pass = (name, evidence) => {
   console.log("PASS", name, JSON.stringify(evidence));
 };
 try {
-  assert.equal(await ev("pocState.version"), "0.3.6");
+  assert.equal(await ev("pocState.version"), "0.3.7");
   const results = await ev(`areenaBrowse.search('Vakooja joukossamme',0)`),
     series = results.items.find(
       (p) => p.kind === "series" && p.title.includes("Vakooja joukossamme"),

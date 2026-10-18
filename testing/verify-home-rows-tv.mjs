@@ -26,7 +26,7 @@ async function visible(name) {
   return b;
 }
 try {
-  assert.equal(await ev("pocState.version"), "0.3.6");
+  assert.equal(await ev("pocState.version"), "0.3.7");
   await until(
     `document.querySelectorAll('.home-cards .card').length`,
     (n) => n > 0,

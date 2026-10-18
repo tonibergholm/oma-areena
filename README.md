@@ -117,3 +117,7 @@ From an episode row, **Left** opens that episode's full description. Closing it 
 Home navigation now scrolls the complete selected row, including its heading, into the shelves viewport. Horizontal card movement is handled separately, so returning to **Jatka katsomista** cannot leave its title above the clipped edge. Padding also keeps the selected card's focus border inside its rail. The hero remains stationary.
 
 `node testing/verify-home-rows-tv.mjs` checks initial display, moving down and back up through rows, returning from hero actions, library refresh, horizontal scrolling and wraparound. It uses an in-memory rail fixture, restores the normal catalogue and does not change viewing history.
+
+### Version 0.3.7: compact watched season tabs
+
+Watched season tabs show only the check mark (for example **Kausi 7 ✓**) alongside the muted styling. The accessible label still announces the watched state.

@@ -90,8 +90,8 @@
         var watched = library.seasonWatched(info.id, info.seasons[i].id);
         b.classList.toggle("watched-season", watched);
         b.textContent =
-          info.seasons[i].title + (watched ? " · ✓ Katsottu" : "");
-        b.setAttribute("aria-label", b.textContent);
+          info.seasons[i].title + (watched ? " ✓" : "");
+        b.setAttribute("aria-label", info.seasons[i].title + (watched ? ", katsottu" : ""));
       }
       b.classList.toggle(
         "series-selected",

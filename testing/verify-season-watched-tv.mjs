@@ -9,7 +9,7 @@ function pass(name, evidence) {
   console.log("PASS", name, JSON.stringify(evidence));
 }
 try {
-  assert.equal(await ev("pocState.version"), "0.3.6");
+  assert.equal(await ev("pocState.version"), "0.3.7");
   await ev(
     `seriesPanel.open('1-3822119',{isSeries:true,seasonId:'1-41273'});true`,
   );
@@ -37,7 +37,7 @@ try {
   assert(marked.season && marked.gray);
   assert.equal(marked.episodes, 12);
   assert(marked.status.includes("12/12"));
-  assert(marked.label.includes("✓ Katsottu"));
+  assert(marked.label.endsWith(" ✓"));
   assert(marked.undo.includes("Peru"));
   pass("Remote bulk marking updates season and every episode", marked);
   const bounds = await ev(

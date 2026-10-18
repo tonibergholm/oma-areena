@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://local.example/areena-poc" version="0.3.6" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://local.example/areena-poc" version="0.3.7" viewmodes="maximized">
 <tizen:application id="AreenaPoC1.Areena" package="AreenaPoC1" required_version="5.0"/>
 <content src="index.html"/><name>Oma Areena</name><icon src="icon.png"/>
 <tizen:profile name="tv-samsung"/><tizen:privilege name="http://tizen.org/privilege/internet"/>
