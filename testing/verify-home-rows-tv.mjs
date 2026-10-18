@@ -26,7 +26,7 @@ async function visible(name) {
   return b;
 }
 try {
-  assert.equal(await ev("pocState.version"), "0.3.7");
+  assert.equal(await ev("pocState.version"), "0.3.8");
   await until(
     `document.querySelectorAll('.home-cards .card').length`,
     (n) => n > 0,
@@ -53,12 +53,11 @@ try {
   await visible("Hero actions return without clipping the heading");
   await ev(`homeScreen.refresh();true`);
   await visible("Library refresh keeps the selected heading visible");
-  const original = await ev(`areenaRequest('/api/catalog')`);
+  const original = await ev(`areenaLibrary.continuing()`);
   // In-memory fixture only, to exercise a long horizontal rail without changing history.
   await ev(
-    `homeScreen.setCatalog(Array.from({length:8},(_,i)=>(${JSON.stringify(original)})[i%${original.length}]));document.getElementById('nav-library').click();true`,
+    `window.__homeRowsLibrary=areenaLibrary;window.areenaLibrary=Object.assign({},areenaLibrary,{continuing:()=>Array.from({length:8},(_,i)=>(${JSON.stringify(original)})[i%${original.length}]),favourites:()=>[]});document.getElementById('nav-library').click();true`,
   );
-  for (let i = 1; i < count; i++) await key(40);
   for (let i = 0; i < 7; i++) await key(39);
   const last = await visible(
     "Horizontal navigation keeps the whole selected row visible",
@@ -71,9 +70,46 @@ try {
   const wrapped = await visible("Horizontal wrap returns to the first card");
   assert.equal(wrapped.horizontal, 0);
   await ev(
-    `homeScreen.setCatalog(${JSON.stringify(original)});document.getElementById('nav-library').click();true`,
+    `window.areenaLibrary=window.__homeRowsLibrary;delete window.__homeRowsLibrary;document.getElementById('nav-library').click();true`,
   );
   await visible("Original home rows restored");
+  assert.equal(
+    await ev(
+      `Array.from(document.querySelectorAll('.home-row')).every(r=>r.dataset.row==='continue'||r.dataset.row==='favourites')`,
+    ),
+    true,
+  );
+  await ev(
+    `window.__homeRowsLibrary=areenaLibrary;window.areenaLibrary=Object.assign({},areenaLibrary,{continuing:()=>[],favourites:()=>[]});homeScreen.show();true`,
+  );
+  assert.equal(await ev(`document.querySelectorAll('.home-row').length`), 0);
+  assert.equal(
+    await ev(`document.querySelectorAll('#hero button:not(.hidden)').length`),
+    0,
+  );
+  assert.equal(
+    await ev(
+      `document.getElementById('nav-browse').classList.contains('nav-selected')`,
+    ),
+    true,
+  );
+  await key(39);
+  await key(13);
+  assert.equal(
+    await ev(
+      `document.getElementById('search-panel').classList.contains('hidden')`,
+    ),
+    false,
+  );
+  await key(10009);
+  await ev(
+    `window.areenaLibrary=window.__homeRowsLibrary;delete window.__homeRowsLibrary;homeScreen.show();true`,
+  );
+  pass(
+    "Empty library guides remote navigation to search without test shortcuts",
+    { ok: true },
+  );
+  await visible("Real library restored after empty-state fixture");
   const errors = await ev(
     `pocEvents.filter(e=>e.event==='error'||e.event==='js-error')`,
   );
@@ -85,6 +121,9 @@ try {
   console.error(e);
   process.exitCode = 1;
 } finally {
+  await ev(
+    `if(window.__homeRowsLibrary){window.areenaLibrary=window.__homeRowsLibrary;delete window.__homeRowsLibrary;homeScreen.show();}true`,
+  ).catch(() => {});
   fs.writeFileSync(
     new URL("../data/home-rows-verification.json", import.meta.url),
     JSON.stringify(report, null, 2),

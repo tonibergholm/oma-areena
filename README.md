@@ -4,6 +4,8 @@ An unofficial, GPL-3.0-or-later TV client for Yle Areena. Built for and tested o
 
 Version 0.3.0 adds full season selection, complete episode lists, Continue Watching, favourites and a new launcher icon. Browse live categories or search Areena with a Finnish on-screen keyboard. Playback uses native Samsung AVPlay with local resume, subtitles, previous/next episode controls and automatic next episode. Your library is saved on the TV; no Yle account or companion server is required.
 
+Version 0.3.8 removes the original test shortcuts. Home shows only your Continue Watching and Favourites rows; find other programmes in Browse or Search.
+
 ## Use on the TV
 
 Open **Oma Areena** in Apps. No computer or companion server is needed for normal use.
@@ -121,3 +123,7 @@ Home navigation now scrolls the complete selected row, including its heading, in
 ### Version 0.3.7: compact watched season tabs
 
 Watched season tabs show only the check mark (for example **Kausi 7 ✓**) alongside the muted styling. The accessible label still announces the watched state.
+
+### Version 0.3.8: personal home rows only
+
+Removed **Sinun ohjelmasi**, the three hard-coded PoC shortcuts, and their startup metadata requests. Home now contains only **Jatka katsomista** and **Suosikit**, omitting either row when empty. A completely empty library shows guidance and focuses **Selaa**, with **Hae** reachable by remote. Existing favourites and viewing history are retained. The home-row verifier also covers empty-state search navigation without changing saved library data.

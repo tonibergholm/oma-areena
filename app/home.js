@@ -1,8 +1,7 @@
 /* Netflix-style home rows. GPL-3.0-or-later. */
 (function () {
   "use strict";
-  var seeds = [],
-    rows = [],
+  var rows = [],
     row = 0,
     column = 0,
     focus = "cards",
@@ -84,8 +83,10 @@
         title: "Suosikit",
         items: favourites.map(normaliseFavourite),
       });
-    if (seeds.length)
-      rows.push({ id: "shortcuts", title: "Sinun ohjelmasi", items: seeds });
+    if (!rows.length) {
+      focus = "nav";
+      nav = 1;
+    }
     var found = rows.findIndex(function (r) {
       return r.id === oldRow;
     });
@@ -165,7 +166,17 @@
       el(id).classList.remove("action-selected");
     });
     var p = item();
-    if (!p) return;
+    actionIds.forEach(function (id) {
+      el(id).classList.toggle("hidden", !p);
+    });
+    if (!p) {
+      el("series").textContent = "Löydä seuraava suosikkisi";
+      el("meta").textContent = "Selaa ohjelmia tai hae nimellä";
+      el("description").textContent =
+        "Valitse Selaa tai Hae ylävalikosta. Suosikkisi ja kesken jääneet ohjelmat ilmestyvät tähän.";
+      el("hero").style.backgroundImage = "none";
+      return;
+    }
     var library = window.areenaLibrary,
       position = library.position(p.id);
     el("series").textContent = p.series || p.episode;
@@ -255,7 +266,8 @@
     };
   });
   function activateNav(index) {
-    focus = "cards";
+    nav = index;
+    focus = item() ? "cards" : "nav";
     paint();
     if (index === 1 || index === 2)
       window.catalogBrowser.open(index === 1 ? "browse" : "search");
@@ -263,6 +275,21 @@
     else refresh();
   }
   function handleKey(k) {
+    if (!item()) {
+      focus = "nav";
+      if (k === 37 || k === 39)
+        nav = (nav + (k === 37 ? -1 : 1) + navIds.length) % navIds.length;
+      else if (k === 13) {
+        activateNav(nav);
+        return;
+      } else if (k === 10009 || k === 27) {
+        try {
+          tizen.application.getCurrentApplication().exit();
+        } catch (e) {}
+      }
+      paint();
+      return;
+    }
     if (focus === "nav") {
       if (k === 37 || k === 39)
         nav = (nav + (k === 37 ? -1 : 1) + navIds.length) % navIds.length;
@@ -314,10 +341,6 @@
     paint();
   }
   window.homeScreen = {
-    setCatalog: function (items) {
-      seeds = items;
-      refresh();
-    },
     refresh: refresh,
     handleKey: handleKey,
     show: function () {

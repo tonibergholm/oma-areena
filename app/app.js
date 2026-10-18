@@ -591,24 +591,18 @@
     avplay: !!(window.webapis && webapis.avplay),
   });
   window.homeScreen.show();
-  window
-    .areenaRequest("/api/catalog")
-    .then(function (items) {
-      window.homeScreen.setCatalog(items);
-      text("connection", "Suoraan Ylestä · Oma Areena 0.3.7");
-      event("catalog-loaded", { count: items.length });
-      return window.areenaLibrary
-        .migrate(function (id) {
-          return window.areenaRequest("/api/program/" + id);
-        })
-        .then(function () {
-          event("library-migrated", {
-            count: window.areenaLibrary.continuing().length,
-          });
-        });
+  text("connection", "Oma Areena 0.3.8");
+  window.areenaLibrary
+    .migrate(function (id) {
+      return window.areenaRequest("/api/program/" + id);
+    })
+    .then(function () {
+      window.homeScreen.refresh();
+      event("library-migrated", {
+        count: window.areenaLibrary.continuing().length,
+      });
     })
     .catch(function (e) {
-      text("connection", "Ylen tiedot eivät ole saatavilla");
       notice(e.message);
     });
 })();

@@ -20,7 +20,7 @@ async function ready(name) {
   return episodes();
 }
 try {
-  assert.equal(await ev("pocState.version"), "0.3.7");
+  assert.equal(await ev("pocState.version"), "0.3.8");
   await ev(
     `seriesPanel.open('1-66244474',{isSeries:true,seasonId:'1-71260775'});true`,
   );

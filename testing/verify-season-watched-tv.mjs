@@ -9,7 +9,7 @@ function pass(name, evidence) {
   console.log("PASS", name, JSON.stringify(evidence));
 }
 try {
-  assert.equal(await ev("pocState.version"), "0.3.7");
+  assert.equal(await ev("pocState.version"), "0.3.8");
   await ev(
     `seriesPanel.open('1-3822119',{isSeries:true,seasonId:'1-41273'});true`,
   );

@@ -3,10 +3,9 @@
 (function () {
   "use strict";
   var requestSequence = 0,
-    cache = {},
-    seeds = ["1-77998674", "1-77565920", "1-41272"];
+    cache = {};
   window.pocEvents = [];
-  window.pocState = { version: "0.3.7" };
+  window.pocState = { version: "0.3.8" };
   function downloadText(url, id) {
     return new Promise(function (resolve, reject) {
       var done = false,
@@ -461,16 +460,6 @@
       console.log("POC", JSON.stringify(data));
       return Promise.resolve({ ok: true });
     }
-    if (path === "/api/catalog")
-      return Promise.all(
-        seeds.map(function (id) {
-          return program(id).catch(function () {
-            return null;
-          });
-        }),
-      ).then(function (items) {
-        return items.filter(Boolean);
-      });
     if (path.indexOf("/api/program/") === 0)
       return program(path.split("/").pop());
     if (path.indexOf("/api/episodes/") === 0)
