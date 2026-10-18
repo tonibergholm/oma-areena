@@ -15,7 +15,8 @@
         <nav>
           <button id="nav-home" class="nav-link">Etusivu</button
           ><button id="nav-browse" class="nav-link">Selaa</button
-          ><button id="nav-search" class="nav-link">Hae</button>
+          ><button id="nav-search" class="nav-link">Hae</button
+          ><button id="nav-library" class="nav-link">Omat</button>
         </nav>
         <small>EPÄVIRALLINEN · POC</small>
       </header>
@@ -27,23 +28,20 @@
           <p id="meta"></p>
           <p id="description">Ladataan ohjelmia…</p>
           <button id="play">▶ Katso</button
-          ><button id="restart">Aloita alusta</button>
+          ><button id="restart">Aloita alusta</button
+          ><button id="details">Kaudet ja jaksot</button
+          ><button id="favourite">☆ Suosikiksi</button
+          ><button id="remove-progress" class="hidden">
+            Poista jatkettavista
+          </button>
         </div>
       </section>
-      <section class="shelf">
-        <h2>Sinun ohjelmasi</h2>
-        <div id="cards"></div>
-      </section>
+      <div id="home-shelves"></div>
       <footer>
         <span>← → Valitse ohjelma</span><span>OK Katso</span
-        ><span>↑ Toiminnot · ↓ Jaksot</span
+        ><span>↑ Toiminnot · ↓ Seuraava rivi</span
         ><span id="connection">Yhdistetään…</span>
       </footer>
-      <section id="episodes" class="hidden">
-        <h2 id="episode-heading">Jaksot</h2>
-        <div id="episode-list"></div>
-        <p>↑ Takaisin ohjelmiin · OK Katso</p>
-      </section>
     </main>
     <section id="browser" class="hidden" aria-label="Selaa ja hae">
       <div class="browser-top">
@@ -68,6 +66,21 @@
         Nuolinäppäimet Liiku · OK Valitse · Takaisin Palaa
       </footer>
     </section>
+    <section id="series-panel" class="hidden" aria-label="Kaudet ja jaksot">
+      <div class="series-header">
+        <div>
+          <p class="eyebrow">KAUDET JA JAKSOT</p>
+          <h1 id="detail-title"></h1>
+          <p id="detail-description"></p>
+        </div>
+        <button id="detail-favourite">☆ Suosikiksi</button>
+      </div>
+      <div id="season-tabs"></div>
+      <p id="series-status" role="status"></p>
+      <div id="season-episodes"></div>
+      <div id="series-pager"></div>
+      <footer>← → Valitse kausi · ↓ Jaksot · OK Katso · Takaisin Palaa</footer>
+    </section>
     <div id="hud" class="hidden">
       <h2 id="playing-title"></h2>
       <p id="player-status"></p>
@@ -75,10 +88,19 @@
       <p id="time"></p>
       <p>OK Tauko / jatka · ← → 10 s · ↓ Tekstitys · Takaisin Lopeta</p>
     </div>
+    <div id="player-actions" class="hidden">
+      <button id="previous-episode">Edellinen jakso</button
+      ><button id="next-episode">Seuraava jakso</button
+      ><button id="player-subtitles">Tekstitys</button
+      ><button id="player-details">Kaudet ja jaksot</button>
+    </div>
     <div id="subtitle"></div>
     <div id="notice" class="hidden"></div>
     <script src="data.js"></script>
+    <script src="library.js"></script>
+    <script src="home.js"></script>
     <script src="app.js"></script>
     <script src="browse.js"></script>
+    <script src="series.js"></script>
   </body>
 </html>

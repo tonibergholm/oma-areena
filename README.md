@@ -2,21 +2,19 @@
 
 An unofficial, GPL-3.0-or-later TV client for Yle Areena. Built for and tested on a Samsung QE55QN85AATXXH running Tizen 6.0, firmware T-NKM2DEUC-2301.1. This project is not affiliated with Yle.
 
-Version 0.2.0 adds live category browsing and programme search across Areena, including a Finnish on-screen keyboard with digits and paged results. The original Elämäni Biisi, Kovan viikon ilta and Pasila shortcuts remain on the home screen. Playback uses native Samsung AVPlay with local resume, subtitles and automatic next episode. There is no Yle account integration; series results open the default episode selected by Yle. Full season selection remains future work.
+Version 0.3.0 adds full season selection, complete episode lists, Continue Watching, favourites and a new launcher icon. Browse live categories or search Areena with a Finnish on-screen keyboard. Playback uses native Samsung AVPlay with local resume, subtitles, previous/next episode controls and automatic next episode. Your library is saved on the TV; no Yle account or companion server is required.
 
 ## Use on the TV
 
 Open **Oma Areena** in Apps. No computer or companion server is needed for normal use.
 
-- Left/right: choose a home programme. OK: play or resume.
-- Press Up twice to reach the header, then choose **Selaa** or **Hae**.
-- In **Selaa**, left/right selects a category; OK loads it. Navigate result cards with arrows and use the page buttons below the grid for more results.
-- In **Hae**, use the on-screen Finnish keyboard, then select **Hae**. A physical keyboard also supports text entry and Enter to search.
-- OK plays a search/category result. Back from playback restores the result list. Back again returns to category selection or editing the search.
-- Up: focus Play / Start over; left/right selects the action, OK activates it.
-- Down: browse available following episodes. Up/down selects; OK plays.
-- During playback: OK toggles pause, left/right seeks 10 seconds, Down toggles subtitles, Back returns home.
-- At the end of an episode, play the next episode when Yle provides a next-episode reference.
+- Home: left/right selects a programme; up/down moves between rows. OK resumes a Continue Watching item or opens a programme’s seasons and episodes.
+- Up from the first row reaches **Katso**, **Aloita alusta**, **Kaudet ja jaksot**, favourites and removal from Continue Watching. Up again reaches **Etusivu**, **Selaa**, **Hae** and **Omat**.
+- In **Selaa**, choose a category, then navigate cards and page buttons with the arrows. Series open their season view; individual programmes play directly.
+- In **Hae**, use the Finnish keyboard and **Hae**, or type using a physical keyboard.
+- Seasons: left/right changes season; Down enters the episode list; OK plays. Up from the season tabs reaches the favourite button. Long seasons have episode page buttons.
+- During playback: OK pauses, left/right seeks 10 seconds, Down toggles subtitles, Up opens previous/next episode and series controls. Back returns to the episode list or search results.
+- Completed episodes show a watched badge and leave Continue Watching. Existing saved positions migrate automatically. Favourites and progress persist across app launches, on this TV only.
 
 ## Build and deploy
 
@@ -61,3 +59,11 @@ Run the dependency-free data-layer tests with `node tests/catalogue.test.mjs`. T
 ### Version 0.2.0 validation
 
 Five data-adapter tests cover fresh category discovery, Finnish query encoding and paging, empty queries, network failures and series resolution. On the Samsung TV, acceptance checks cover live categories, result paging, keyboard input, Finnish characters and digits, search playback, returning to results and an empty-result recovery path. The existing playback, subtitles, seek/resume and automatic-next-episode regression checks also pass. Local reports remain excluded from Git.
+
+### Version 0.3.0 validation
+
+Seven catalogue tests cover complete season pagination (including a synthetic 205-episode season) and episode transitions across season boundaries. Six library tests cover persistence, completion, favourites, removal, legacy migration and season preferences. Run `node tests/catalogue.test.mjs` and `node tests/library.test.mjs`.
+
+On-device acceptance covers six Pasila seasons, all 12 episodes in a season, remote season changes and favourites, saved-position playback, previous/next controls, automatic completion and returning to details. The episode panel fits 1920×1080. `verify-tv.mjs` runs the library acceptance checks; `verify-browse-tv.mjs` checks categories, paging, search, Finnish/numeric input and the search → series → playback → results return path. Test viewing state should be backed up and restored when using a personal TV.
+
+The new icon’s high-resolution source is `assets/oma-areena-icon.png`; the installed launcher icon is `app/icon.png`. Its built-in imagegen prompt is recorded in `assets/icon-prompt.txt`.

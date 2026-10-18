@@ -2,10 +2,11 @@
  * Preview endpoint and metadata fields follow yle-dl, Antti Ajanki et al. */
 (function () {
   "use strict";
-  var cache = {},
+  var requestSequence = 0,
+    cache = {},
     seeds = ["1-77998674", "1-77565920", "1-41272"];
   window.pocEvents = [];
-  window.pocState = { version: "0.2.0" };
+  window.pocState = { version: "0.3.0" };
   function downloadText(url, id) {
     return new Promise(function (resolve, reject) {
       var done = false,
@@ -29,7 +30,7 @@
         var req = new tizen.DownloadRequest(
           url,
           "wgt-private-tmp",
-          "areena-" + id + "-" + Date.now() + ".json",
+          "areena-" + id + "-" + Date.now() + "-" + ++requestSequence + ".json",
           "ALL",
           {
             Origin: "https://areena.yle.fi",
@@ -110,6 +111,10 @@
         ep = o.episode_number;
       var p = {
         id: id,
+        seriesId: o.series && o.series.id,
+        seasonId: o.season && o.season.id,
+        seasonNumber: season,
+        episodeNumber: ep,
         series: title(o.series && o.series.title),
         episode:
           (season && ep ? "K" + season + ", J" + ep + ": " : "") +
@@ -127,17 +132,17 @@
     });
   }
   function episodes(id) {
-    var out = [],
-      seen = {};
-    function next(pid) {
-      if (!pid || seen[pid] || out.length >= 12) return Promise.resolve(out);
-      seen[pid] = true;
-      return program(pid).then(function (p) {
-        out.push(p);
-        return next(p.next);
+    return program(id).then(function (p) {
+      if (!p.seriesId) return [p];
+      return seriesInfo(p.seriesId, true).then(function (info) {
+        var season =
+          info.seasons.filter(function (s) {
+            return s.id === p.seasonId;
+          })[0] || info.seasons[0];
+        if (!season) return [p];
+        return seasonEpisodes(info.id, season.id);
       });
-    }
-    return next(id);
+    });
   }
   var categoryCache = null;
   function apiUrl(path) {
@@ -223,6 +228,189 @@
       },
     );
   }
+  var seriesCache = {},
+    seasonCache = {};
+  function parsePage(html) {
+    var match = html.match(
+      /<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/,
+    );
+    if (!match) throw Error("Sarjan tietoja ei saatu Ylestä");
+    return JSON.parse(match[1]).props.pageProps;
+  }
+  function seriesInfo(id, isSeries) {
+    if (!/^1-\d+$/.test(id))
+      return Promise.reject(Error("Virheellinen ohjelmatunnus"));
+    if (!isSeries)
+      return program(id).then(function (p) {
+        if (p.seriesId) return seriesInfo(p.seriesId, true);
+        return {
+          id: p.id,
+          kind: "program",
+          title: p.series || p.episode,
+          description: p.description,
+          image: p.image,
+          seasons: [],
+          program: p,
+        };
+      });
+    if (seriesCache[id] && Date.now() - seriesCache[id].at < 240000)
+      return Promise.resolve(seriesCache[id].value);
+    return downloadText("https://areena.yle.fi/" + id, id).then(
+      function (html) {
+        var props = parsePage(html),
+          view = props.view || {},
+          header = view.header || {};
+        var tabs = view.tabs || [],
+          tab =
+            tabs.filter(function (t) {
+              return t.slug === "jaksot";
+            })[0] || tabs[0];
+        var list =
+          tab &&
+          (tab.content || []).filter(function (c) {
+            return c.type === "list" && c.source && c.title !== "Katso myös";
+          })[0];
+        if (!list) throw Error("Sarjan jaksoja ei ole saatavilla");
+        var filters = list.filters || [],
+          options = filters.length ? filters[0].options || [] : [];
+        if (!options.length)
+          options = [{ title: "Kaikki jaksot", parameters: {}, default: true }];
+        var info = {
+          id: id,
+          kind: "series",
+          title: view.title || "Sarja",
+          description: header.description || "",
+          image: "",
+          source: list.source.uri,
+          seasons: options.map(function (o, i) {
+            return {
+              id: String((o.parameters || {})["path.season"] || i),
+              title: o.title || "Jaksot",
+              parameters: o.parameters || {},
+              isDefault: !!o.default,
+            };
+          }),
+        };
+        var image = view.coverImage || header.image;
+        if (image && image.id)
+          info.image =
+            "https://images.cdn.yle.fi/image/upload/w_1280,h_720,c_fill/" +
+            image.id;
+        seriesCache[id] = { at: Date.now(), value: info };
+        return info;
+      },
+    );
+  }
+  function seasonEpisodes(seriesId, seasonId) {
+    var key = seriesId + ":" + seasonId;
+    if (seasonCache[key] && Date.now() - seasonCache[key].at < 240000)
+      return Promise.resolve(seasonCache[key].items);
+    return seriesInfo(seriesId, true).then(function (info) {
+      var season = info.seasons.filter(function (s) {
+        return s.id === seasonId;
+      })[0];
+      if (!season) throw Error("Tuntematon kausi");
+      var parameters = Object.keys(season.parameters)
+        .map(function (k) {
+          return (
+            encodeURIComponent(k) +
+            "=" +
+            encodeURIComponent(season.parameters[k])
+          );
+        })
+        .join("&");
+      var items = [],
+        seen = {},
+        offset = 0;
+      function nextPage() {
+        return ui(
+          info.source + "&" + parameters + "&offset=" + offset + "&limit=100",
+        ).then(function (d) {
+          var raw = d.data || [];
+          raw
+            .map(mapCard)
+            .filter(Boolean)
+            .forEach(function (card) {
+              if (card.kind !== "program" || seen[card.id]) return;
+              seen[card.id] = true;
+              card.seriesId = seriesId;
+              card.series = info.title;
+              card.seasonId = seasonId;
+              card.episode = card.title;
+              items.push(card);
+            });
+          offset += raw.length;
+          var count = (d.meta || {}).count;
+          if (
+            raw.length &&
+            (typeof count === "number" ? offset < count : raw.length === 100)
+          )
+            return nextPage();
+          seasonCache[key] = { at: Date.now(), items: items };
+          return items;
+        });
+      }
+      return nextPage();
+    });
+  }
+  function neighbours(p) {
+    if (!p.seriesId)
+      return Promise.resolve({ previous: null, next: p.next || null });
+    return seriesInfo(p.seriesId, true).then(function (info) {
+      var index = info.seasons.findIndex(function (s) {
+        return s.id === p.seasonId;
+      });
+      if (index < 0) return { previous: null, next: p.next || null };
+      return seasonEpisodes(info.id, info.seasons[index].id).then(
+        function (items) {
+          var i = items.findIndex(function (item) {
+            return item.id === p.id;
+          });
+          if (i < 0) return { previous: null, next: p.next || null };
+          var result = {
+            previous: i > 0 ? items[i - 1].id : null,
+            next: i + 1 < items.length ? items[i + 1].id : p.next || null,
+          };
+          // Yle may expose seasons newest-first. Compare numeric season labels for boundaries.
+          var ordered = info.seasons.slice().sort(function (a, b) {
+            return (
+              Number((a.title.match(/\d+/) || [0])[0]) -
+              Number((b.title.match(/\d+/) || [0])[0])
+            );
+          });
+          var seasonIndex = ordered.findIndex(function (s) {
+            return s.id === p.seasonId;
+          });
+          var tasks = [];
+          if (!result.previous && seasonIndex > 0)
+            tasks.push(
+              seasonEpisodes(info.id, ordered[seasonIndex - 1].id).then(
+                function (previous) {
+                  if (previous.length)
+                    result.previous = previous[previous.length - 1].id;
+                },
+              ),
+            );
+          if (!result.next && seasonIndex + 1 < ordered.length)
+            tasks.push(
+              seasonEpisodes(info.id, ordered[seasonIndex + 1].id).then(
+                function (next) {
+                  if (next.length) result.next = next[0].id;
+                },
+              ),
+            );
+          return Promise.all(tasks).then(function () {
+            return result;
+          });
+        },
+      );
+    });
+  }
+  window.areenaSeries = {
+    info: seriesInfo,
+    episodes: seasonEpisodes,
+    neighbours: neighbours,
+  };
   window.areenaBrowse = {
     categories: categories,
     list: function (category, page) {
@@ -270,7 +458,16 @@
       console.log("POC", JSON.stringify(data));
       return Promise.resolve({ ok: true });
     }
-    if (path === "/api/catalog") return Promise.all(seeds.map(program));
+    if (path === "/api/catalog")
+      return Promise.all(
+        seeds.map(function (id) {
+          return program(id).catch(function () {
+            return null;
+          });
+        }),
+      ).then(function (items) {
+        return items.filter(Boolean);
+      });
     if (path.indexOf("/api/program/") === 0)
       return program(path.split("/").pop());
     if (path.indexOf("/api/episodes/") === 0)

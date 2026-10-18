@@ -1,0 +1,47 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {connect,delay} from './tv-client.mjs';
+const tv=await connect();
+const {evaluate:ev,until,key}=tv;
+const report={version:'0.3.0',checks:[]};
+const pass=(name,evidence)=>{report.checks.push({name,evidence});console.log('PASS',name,JSON.stringify(evidence));};
+const playing=()=>until(`({state:webapis.avplay.getState(),time:webapis.avplay.getCurrentTime(),title:document.getElementById('playing-title').textContent})`,v=>v.state==='PLAYING'&&v.time>1000);
+try{
+ await until(`pocEvents.some(e=>e.event==='library-migrated')`,Boolean);
+ assert.equal(await ev('pocState.version'),'0.3.0');
+ pass('Existing viewing history migrated',{entries:await ev('areenaLibrary.continuing().length')});
+ await ev(`seriesPanel.open('1-3822119',{isSeries:true});true`);
+ const seasons=await until(`Array.from(document.querySelectorAll('#season-tabs button')).map(b=>b.textContent)`,v=>v.length===6);
+ await until(`document.querySelectorAll('#season-episodes .episode').length`,v=>v===12);
+ pass('Complete Pasila season',{seasons,count:12});
+ const bounds=await ev(`({pager:document.getElementById('series-pager').getBoundingClientRect().bottom,episodes:document.getElementById('season-episodes').getBoundingClientRect().bottom,height:innerHeight})`);
+ assert(bounds.pager<1040);pass('Episode layout fits TV',bounds);
+ await key(39);await until(`document.getElementById('series-status').textContent`,v=>v.includes('Kausi 2')&&v.includes('12 jaksoa'));
+ await key(37);await until(`document.getElementById('series-status').textContent`,v=>v.includes('Kausi 1')&&v.includes('12 jaksoa'));
+ pass('Remote switches full seasons',{ok:true});
+ const wasFavourite=await ev(`areenaLibrary.isFavourite({id:'1-3822119'})`);
+ await key(38);await key(13);
+ assert.equal(await ev(`areenaLibrary.isFavourite({id:'1-3822119'})`),!wasFavourite);
+ pass('Remote favourite toggle',{saved:!wasFavourite});
+ await key(40);await key(40);await key(13);
+ let p=await playing();assert(p.title.includes('Vasikka'));pass('Season episode playback',p);
+ await key(13);assert.equal(await ev('webapis.avplay.getState()'),'PAUSED');await key(39);await key(13);
+ await until('webapis.avplay.getCurrentTime()',v=>v>10000);await key(10009);
+ assert.equal(await ev('seriesPanel.isActive()'),true);
+ const stored=await ev(`areenaLibrary.position('1-41272')`);assert(stored>10000);
+ pass('Playback saves resume and restores episodes',{position:stored});
+ await key(13);p=await playing();assert(p.time>=stored-1500);pass('Episode resumes at saved position',p);
+ await key(38);await until(`!document.getElementById('next-episode').disabled`,Boolean);
+ await ev(`document.getElementById('next-episode').click();true`);
+ p=await playing();assert(p.title.includes('Kiinalainen'));pass('Next episode action',p);
+ await key(38);await ev(`document.getElementById('previous-episode').click();true`);
+ p=await playing();assert(p.title.includes('Vasikka'));pass('Previous episode action',p);
+ await ev(`webapis.avplay.seekTo(webapis.avplay.getDuration()-2000);true`);
+ p=await until(`({state:webapis.avplay.getState(),time:webapis.avplay.getCurrentTime(),title:document.getElementById('playing-title').textContent})`,v=>v.state==='PLAYING'&&v.time>1000&&v.title.includes('Kiinalainen'));
+ assert.equal(await ev(`areenaLibrary.watched('1-41272')`),true);pass('Automatic next marks completed episode watched',p);
+ await key(10009);await key(10009);
+ pass('Home rows available',await ev(`Array.from(document.querySelectorAll('.home-row')).map(r=>r.dataset.row)`));
+ const errors=await ev(`pocEvents.filter(e=>e.event==='error'||e.event==='js-error')`);assert.equal(errors.length,0,JSON.stringify(errors));pass('No runtime errors',{count:errors.length});
+ report.complete=true;
+}catch(e){report.complete=false;report.error=String(e);console.error(e);process.exitCode=1;}
+finally{fs.writeFileSync(new URL('../data/library-verification.json',import.meta.url),JSON.stringify(report,null,2));tv.close();}

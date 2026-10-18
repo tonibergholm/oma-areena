@@ -1,0 +1,6 @@
+Generated using the built-in imagegen tool, 2026-10-18.
+
+Use case: logo-brand. Create one polished app icon for Oma Areena, an independent Finnish television streaming app. Square full-bleed midnight navy tile, large sculpted icy cyan continuous O ring with a crisp right-pointing play triangle cutout integrated inside. Minimal confident Nordic geometry, subtle luminous blue dimensional shading, very high contrast, thick simple silhouette recognizable at 117x117 pixels from across a living room. Centered symbol with generous safe margin. No lettering, no words, no mockup, no device, no shadows outside the square, no border. Production-ready square app icon, opaque background.
+
+Source: assets/oma-areena-icon.png
+Launcher export: app/icon.png, 117x117 PNG, resized with ImageMagick.

@@ -64,7 +64,10 @@ header small {
 }
 .shade {
   position: absolute;
-  top: 0; right: 0; bottom: 0; left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background:
     linear-gradient(
       90deg,
@@ -246,7 +249,10 @@ body.playing #home {
 }
 #episodes {
   position: absolute;
-  top: 120px; right: 0; bottom: 0; left: 0;
+  top: 120px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: #0b0c10;
   padding: 55px 90px;
   z-index: 6;
@@ -300,7 +306,10 @@ nav .nav-selected {
 }
 #browser {
   position: absolute;
-  top: 0; right: 0; bottom: 0; left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 7;
   background: #0b0c10;
   padding: 55px 90px;
@@ -453,4 +462,281 @@ nav .nav-selected {
 }
 .browse-card:focus {
   outline: none;
+}
+/* Home rows and the complete-series view, compatible with Chromium 76. */
+#hero {
+  height: 435px;
+}
+.hero-copy {
+  padding-top: 128px;
+  width: 1740px;
+  margin-left: 90px;
+  padding-left: 0;
+}
+.hero-copy .eyebrow {
+  margin-bottom: 10px;
+}
+#series {
+  font-size: 58px;
+  line-height: 1.1;
+  height: 65px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 1300px;
+}
+#meta {
+  font-size: 22px;
+  margin: 8px 0;
+}
+#description {
+  font-size: 22px;
+  line-height: 1.35;
+  height: 60px;
+  margin: 8px 0 16px;
+  max-width: 1050px;
+}
+.hero-copy button {
+  font-size: 22px;
+  padding: 15px 22px;
+  margin-right: 14px;
+}
+#details,
+#favourite,
+#remove-progress {
+  background: #303846;
+  color: white;
+}
+#home-shelves {
+  position: absolute;
+  top: 450px;
+  left: 0;
+  right: 0;
+  bottom: 70px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 90px;
+}
+#home {
+  width: 1920px;
+  height: 1080px;
+}
+#home > footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 90px;
+}
+.home-row {
+  margin-bottom: 22px;
+}
+.home-row h2 {
+  font-size: 27px;
+  margin: 4px 0 16px;
+}
+.home-cards {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 5px 4px 12px;
+  scrollbar-width: none;
+}
+.home-cards .card {
+  width: 420px;
+  min-width: 420px;
+  height: 224px;
+  padding: 0;
+  margin: 0 24px 0 0;
+  text-align: left;
+  color: white;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.home-cards .card img {
+  height: 142px;
+}
+.home-cards .card .label {
+  padding: 10px 14px;
+}
+.home-cards .card h3 {
+  font-size: 22px;
+  margin: 0 0 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-cards .card p {
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.home-cards .resume {
+  top: 138px;
+}
+.watched-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 16px;
+  padding: 6px 9px;
+  background: #132725;
+  border-radius: 4px;
+}
+#series-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  background: #0b0c10;
+  padding: 55px 90px;
+  overflow: hidden;
+}
+.series-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 180px;
+}
+.series-header > div {
+  max-width: 1230px;
+}
+.series-header h1 {
+  font-size: 52px;
+  line-height: 1.05;
+  max-height: 110px;
+  margin: 10px 0 12px;
+  overflow: hidden;
+}
+.series-header p {
+  font-size: 22px;
+  line-height: 1.35;
+  max-height: 60px;
+  overflow: hidden;
+  margin: 0;
+}
+.series-header .eyebrow {
+  font-size: 16px;
+}
+.series-header button {
+  background: #303846;
+  color: white;
+  font-size: 23px;
+  min-width: 235px;
+}
+#season-tabs {
+  display: flex;
+  overflow-x: auto;
+  padding: 10px 5px 18px;
+  white-space: nowrap;
+}
+#season-tabs button {
+  background: #252c39;
+  color: white;
+  font-size: 23px;
+  padding: 15px 25px;
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+#season-tabs .active-season {
+  background: #344659;
+}
+#series-status {
+  font-size: 23px;
+  color: #aab6c8;
+  margin: 12px 0 20px;
+  min-height: 27px;
+}
+#season-episodes {
+  height: 580px;
+  overflow-y: auto;
+  padding: 6px;
+  scrollbar-width: none;
+}
+#season-episodes .episode {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 142px;
+  margin: 0 0 16px;
+  padding: 0;
+  background: #20242e;
+  overflow: hidden;
+  border: 3px solid transparent;
+}
+#season-episodes .episode img {
+  height: 136px;
+  width: 242px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+#season-episodes .episode > div {
+  padding: 14px 25px;
+  overflow: hidden;
+}
+#season-episodes .episode strong {
+  display: block;
+  font-size: 27px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#season-episodes .episode span {
+  display: block;
+  font-size: 21px;
+  color: #c1c8d4;
+  margin: 9px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#season-episodes .episode small {
+  font-size: 20px;
+  color: #8bd5ea;
+}
+#series-panel .series-selected {
+  outline: 4px solid #83d5f8;
+  outline-offset: 1px;
+  background: #344659;
+  color: white;
+}
+#series-pager {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0;
+}
+#series-pager button {
+  background: #252c39;
+  color: white;
+  font-size: 22px;
+  padding: 13px 22px;
+}
+#series-panel footer {
+  position: absolute;
+  bottom: 18px;
+  left: 90px;
+  padding: 0;
+  font-size: 20px;
+}
+#player-actions {
+  position: absolute;
+  bottom: 220px;
+  left: 90px;
+  right: 90px;
+  z-index: 5;
+}
+#player-actions button {
+  background: #303846;
+  color: white;
+  font-size: 24px;
+}
+#player-actions button:disabled {
+  opacity: 0.4;
+}
+#categories button {
+  margin-right: 16px;
 }

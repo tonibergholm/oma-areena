@@ -218,7 +218,9 @@
     active = false;
     ++serial;
     el("browser").classList.add("hidden");
-    window.openAreenaProgram(items[selected].id);
+    if (items[selected].kind === "series")
+      window.seriesPanel.open(items[selected].id, { isSeries: true });
+    else window.openAreenaProgram(items[selected].id);
   }
   function open(which) {
     active = true;
@@ -261,12 +263,13 @@
     el("browser").classList.add("hidden");
   }
   function restore() {
-    if (!returnPending) return;
+    if (!returnPending) return false;
     returnPending = false;
     active = true;
     el("browser").classList.remove("hidden");
     focus = "grid";
     paintResults();
+    return true;
   }
   el("browse-tab").onclick = function () {
     open("browse");

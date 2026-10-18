@@ -1,53 +1,40 @@
-/* Oma Areena PoC — GPL-3.0-or-later */
+/* Native Samsung playback and app orchestration. GPL-3.0-or-later. */
 (function () {
   "use strict";
-  var catalog = [],
-    selected = 0,
-    episodeIndex = 0,
-    episodes = [],
-    mode = "home",
-    actionIndex = 0,
-    navIndex = 0,
+  var mode = "home",
     current = null,
     av = null,
     clock = 0,
+    serial = 0,
     hideTimer = null,
     subtitleTimer = null,
     subs = true,
-    loadSerial = 0;
+    lastSave = 0,
+    seeking = false;
+  var queue = [],
+    previous = null,
+    next = null,
+    action = -1;
+  var actionIds = [
+    "previous-episode",
+    "next-episode",
+    "player-subtitles",
+    "player-details",
+  ];
   function el(id) {
     return document.getElementById(id);
   }
   function text(id, value) {
     el(id).textContent = value || "";
   }
-  function request(path, method, data) {
-    return window.areenaRequest(path, method, data);
-  }
   function event(name, data) {
-    request("/api/event", "POST", {
-      event: name,
-      data: data || {},
-      at: Date.now(),
-    }).catch(function () {});
-  }
-  function saved(id) {
-    try {
-      return JSON.parse(localStorage.getItem("progress:" + id) || "0");
-    } catch (e) {
-      return 0;
-    }
-  }
-  function save() {
-    if (av)
-      try {
-        if (av.getState() === "PLAYING" || av.getState() === "PAUSED")
-          clock = av.getCurrentTime();
-      } catch (e) {}
-    if (current && clock > 0)
-      try {
-        localStorage.setItem("progress:" + current.id, JSON.stringify(clock));
-      } catch (e) {}
+    window
+      .areenaRequest("/api/event", "POST", {
+        event: name,
+        data: data || {},
+        at: Date.now(),
+      })
+      .catch(function () {});
   }
   function fmt(ms) {
     var s = Math.floor(ms / 1000);
@@ -59,80 +46,29 @@
           ("0" + (s % 60)).slice(-2)
       : Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
   }
-  function notice(s) {
-    text("notice", s);
+  function notice(message) {
+    text("notice", message);
     el("notice").classList.remove("hidden");
     setTimeout(function () {
       el("notice").classList.add("hidden");
     }, 7000);
   }
-  function paintNav() {
-    ["nav-home", "nav-browse", "nav-search"].forEach(function (id, i) {
-      el(id).classList.toggle("nav-selected", mode === "nav" && i === navIndex);
-    });
+  window.omaNotice = notice;
+  function save() {
+    if (!current || seeking) return;
+    if (av)
+      try {
+        if (av.getState() === "PLAYING" || av.getState() === "PAUSED")
+          clock = av.getCurrentTime();
+      } catch (e) {}
+    if (clock > 0) {
+      window.areenaLibrary.update(current, clock);
+      lastSave = Date.now();
+    }
   }
-  function render() {
-    el("play").classList.remove("action-selected");
-    el("restart").classList.remove("action-selected");
-    var cards = el("cards");
-    cards.textContent = "";
-    catalog.forEach(function (p, i) {
-      var c = document.createElement("div");
-      c.className = "card" + (i === selected ? " selected" : "");
-      var img = document.createElement("img");
-      img.src = p.image;
-      img.alt = "";
-      c.appendChild(img);
-      var l = document.createElement("div");
-      l.className = "label";
-      var h = document.createElement("h3");
-      h.textContent = p.series;
-      var d = document.createElement("p");
-      d.textContent = p.episode + " · " + Math.round(p.duration / 60) + " min";
-      l.appendChild(h);
-      l.appendChild(d);
-      c.appendChild(l);
-      var bar = document.createElement("div");
-      bar.className = "resume";
-      bar.style.width =
-        Math.min(100, (saved(p.id) / (p.duration * 1000)) * 100) + "%";
-      c.appendChild(bar);
-      c.onclick = function () {
-        selected = i;
-        render();
-        start(p.id, false);
-      };
-      cards.appendChild(c);
-    });
-    var p = catalog[selected];
-    if (!p) return;
-    text("series", p.series);
-    text("meta", p.episode + "  ·  " + Math.round(p.duration / 60) + " min");
-    text("description", p.description);
-    el("hero").style.backgroundImage = 'url("' + p.image + '")';
-    text(
-      "play",
-      saved(p.id) > 10000 ? "▶ Jatka " + fmt(saved(p.id)) : "▶ Katso",
-    );
-  }
-  function hud(s) {
-    if (s !== undefined) text("player-status", s);
-    el("hud").classList.remove("hidden");
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(function () {
-      if (mode === "player" && av && av.getState() === "PLAYING")
-        el("hud").classList.add("hidden");
-    }, 5000);
-  }
-  function fail(e) {
-    event("error", { message: String(e), program: current && current.id });
-    stop();
-    if (window.catalogBrowser) window.catalogBrowser.restore();
-    notice("Toisto ei onnistunut: " + (e.message || e));
-  }
-  function stop() {
-    ++loadSerial;
-    save();
+  function stop(savePosition) {
+    ++serial;
+    if (savePosition !== false) save();
     clearTimeout(hideTimer);
     clearTimeout(subtitleTimer);
     if (av)
@@ -140,36 +76,106 @@
         av.stop();
         av.close();
       } catch (e) {}
-    el("subtitle").textContent = "";
+    text("subtitle", "");
     el("hud").classList.add("hidden");
+    el("player-actions").classList.add("hidden");
     document.body.classList.remove("playing");
     el("home").classList.remove("hidden");
     mode = "home";
+    action = -1;
     clock = 0;
-    render();
+    seeking = false;
+    window.homeScreen.show();
   }
-  function start(id, fromStart) {
+  function returnToOrigin() {
+    if (window.seriesPanel && window.seriesPanel.restore(current)) return;
+    if (window.catalogBrowser && window.catalogBrowser.restore()) return;
+    window.homeScreen.show();
+  }
+  function fail(error) {
+    event("error", { message: String(error), program: current && current.id });
     stop();
-    var serial = loadSerial;
+    returnToOrigin();
+    notice("Toisto ei onnistunut: " + (error.message || error));
+  }
+  function actions() {
+    return actionIds.filter(function (id) {
+      return !el(id).disabled;
+    });
+  }
+  function paintActions() {
+    el("previous-episode").disabled = !previous;
+    el("next-episode").disabled = !next;
+    el("player-subtitles").textContent = subs
+      ? "Tekstitys pois"
+      : "Tekstitys päälle";
+    actionIds.forEach(function (id) {
+      el(id).classList.remove("action-selected");
+    });
+    var ids = actions();
+    if (action >= 0) {
+      action = Math.min(action, ids.length - 1);
+      el(ids[action]).classList.add("action-selected");
+    }
+    el("player-actions").classList.toggle("hidden", action < 0);
+  }
+  function hud(message) {
+    if (message !== undefined) text("player-status", message);
+    el("hud").classList.remove("hidden");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      if (mode === "player" && action < 0 && av && av.getState() === "PLAYING")
+        el("hud").classList.add("hidden");
+    }, 5000);
+  }
+  function neighbours(p, ticket) {
+    var index = queue.indexOf(p.id);
+    previous = index > 0 ? queue[index - 1] : null;
+    next =
+      index >= 0 && index + 1 < queue.length
+        ? queue[index + 1]
+        : p.next || null;
+    paintActions();
+    window.areenaSeries
+      .neighbours(p)
+      .then(function (result) {
+        if (ticket !== serial) return;
+        previous = result.previous || previous;
+        next = result.next || next;
+        paintActions();
+      })
+      .catch(function (error) {
+        event("neighbours-unavailable", {
+          message: String(error),
+          program: p.id,
+        });
+      });
+  }
+  function start(id, options) {
+    options = options || {};
+    stop();
+    var ticket = serial;
+    queue = options.queue || [];
     mode = "loading";
     notice("Avataan ohjelmaa…");
-    request("/api/program/" + id)
+    window
+      .areenaRequest("/api/program/" + id)
       .then(function (p) {
-        if (serial !== loadSerial) return;
+        if (ticket !== serial) return;
         current = p;
-        id = p.id;
-        clock = fromStart ? 0 : saved(id);
-        var resumePosition = clock;
-        event("open", { program: id, resume: clock });
+        clock = options.restart ? 0 : window.areenaLibrary.position(p.id);
+        var resume = clock;
+        event("open", { program: p.id, resume: resume });
         if (!window.webapis || !webapis.avplay)
           throw Error("Samsung AVPlay ei ole käytettävissä tässä selaimessa");
         av = webapis.avplay;
         el("notice").classList.add("hidden");
         el("home").classList.add("hidden");
-        el("episodes").classList.add("hidden");
         document.body.classList.add("playing");
         text("playing-title", p.series + " — " + p.episode);
         mode = "player";
+        lastSave = Date.now();
+        action = -1;
         hud("Ladataan…");
         av.open(p.manifest);
         try {
@@ -184,35 +190,42 @@
         av.setDisplayMethod("PLAYER_DISPLAY_MODE_LETTER_BOX");
         av.setListener({
           onbufferingstart: function () {
-            hud("Puskurointi…");
-            event("buffering", { program: id });
+            if (ticket === serial) {
+              hud("Puskurointi…");
+              event("buffering", { program: p.id });
+            }
           },
           onbufferingcomplete: function () {
-            hud("");
+            if (ticket === serial) hud("");
           },
           oncurrentplaytime: function (ms) {
+            if (ticket !== serial) return;
             clock = ms;
             text("time", fmt(ms) + " / " + fmt(p.duration * 1000));
             el("progress").style.width =
               Math.min(100, (ms / (p.duration * 1000)) * 100) + "%";
-            if (Math.floor(ms / 1000) % 5 === 0) save();
+            if (!seeking && Date.now() - lastSave >= 5000) save();
           },
           onstreamcompleted: function () {
-            localStorage.removeItem("progress:" + id);
-            clock = 0;
-            event("ended", { program: id });
-            if (p.next) start(p.next, false);
-            else stop();
+            if (ticket !== serial) return;
+            window.areenaLibrary.update(p, p.duration * 1000, true);
+            event("ended", { program: p.id });
+            var target = next,
+              oldQueue = queue.slice();
+            stop(false);
+            if (target) start(target, { queue: oldQueue });
+            else returnToOrigin();
           },
-          onerror: function (err) {
-            fail(Error(err));
+          onerror: function (error) {
+            if (ticket === serial) fail(Error(error));
           },
-          onsubtitlechange: function (duration, s) {
+          onsubtitlechange: function (duration, cue) {
+            if (ticket !== serial) return;
             clearTimeout(subtitleTimer);
             text(
               "subtitle",
               subs
-                ? String(s)
+                ? String(cue)
                     .replace(/\u0000/g, "")
                     .replace(/<br\s*\/?\s*>/gi, "\n")
                     .replace(/<[^>]*>/g, "")
@@ -225,26 +238,41 @@
         });
         av.prepareAsync(
           function () {
+            if (ticket !== serial) return;
             try {
-              var resume = resumePosition;
+              seeking = true;
               av.play();
-              if (resume > 10000 && resume < p.duration * 1000 - 10000)
-                av.seekTo(resume);
-              var tracks = av.getTotalTrackInfo();
+              if (resume >= 10000 && resume < p.duration * 1000 - 15000)
+                av.seekTo(
+                  resume,
+                  function () {
+                    seeking = false;
+                  },
+                  function () {
+                    seeking = false;
+                    notice("Jatkaminen ei onnistunut. Ohjelma alkoi alusta.");
+                  },
+                );
+              else seeking = false;
+              var tracks = av.getTotalTrackInfo(),
+                subtitle = tracks.filter(function (t) {
+                  return t.type === "TEXT";
+                })[0];
+              if (subtitle) {
+                av.setSelectTrack("TEXT", subtitle.index);
+                av.setSilentSubtitle(!subs);
+              }
               event("prepared", {
-                program: id,
+                program: p.id,
                 duration: av.getDuration(),
                 tracks: tracks,
               });
-              var sub = tracks.filter(function (t) {
-                return t.type === "TEXT";
-              })[0];
-              if (sub) av.setSelectTrack("TEXT", sub.index);
+              neighbours(p, ticket);
               hud("");
               setTimeout(function () {
-                if (mode === "player")
+                if (ticket === serial && mode === "player")
                   event("playback-check", {
-                    program: id,
+                    program: p.id,
                     state: av.getState(),
                     time: av.getCurrentTime(),
                   });
@@ -253,13 +281,13 @@
               fail(e);
             }
           },
-          function (e) {
-            fail(e);
+          function (error) {
+            if (ticket === serial) fail(error);
           },
         );
       })
-      .catch(function (e) {
-        if (serial === loadSerial) fail(e);
+      .catch(function (error) {
+        if (ticket === serial) fail(error);
       });
   }
   function toggle() {
@@ -268,6 +296,7 @@
       if (av.getState() === "PLAYING") {
         clock = av.getCurrentTime();
         av.pause();
+        save();
         hud("Tauko");
         event("pause", { program: current.id, time: clock });
       } else if (av.getState() === "PAUSED") {
@@ -285,54 +314,53 @@
         0,
         Math.min(av.getDuration() - 1000, av.getCurrentTime() + delta),
       );
+      seeking = true;
       av.seekTo(
         dest,
         function () {
+          seeking = false;
           clock = dest;
           save();
           hud("");
           event("seek", { program: current.id, time: dest });
         },
         function (e) {
+          seeking = false;
           notice(String(e));
         },
       );
       hud(delta > 0 ? "+10 sekuntia" : "−10 sekuntia");
     } catch (e) {
+      seeking = false;
       notice(String(e));
     }
   }
-  function showEpisodes() {
-    mode = "episodes";
-    episodeIndex = 0;
-    el("episodes").classList.remove("hidden");
-    text("episode-heading", catalog[selected].series + " · Jaksot");
-    el("episode-list").textContent = "Ladataan…";
-    request("/api/episodes/" + catalog[selected].id)
-      .then(function (items) {
-        episodes = items;
-        drawEpisodes();
-      })
-      .catch(function (e) {
-        notice(e.message);
-        mode = "home";
-        el("episodes").classList.add("hidden");
-      });
+  function toggleSubtitles() {
+    subs = !subs;
+    try {
+      av.setSilentSubtitle(!subs);
+    } catch (e) {}
+    if (!subs) text("subtitle", "");
+    hud(subs ? "Tekstitys päällä" : "Tekstitys pois");
+    paintActions();
   }
-  function drawEpisodes() {
-    var list = el("episode-list");
-    list.textContent = "";
-    episodes.forEach(function (p, i) {
-      var b = document.createElement("button");
-      b.className = "episode" + (i === episodeIndex ? " selected" : "");
-      b.textContent = p.episode + " · " + Math.round(p.duration / 60) + " min";
-      b.onclick = function () {
-        start(p.id, false);
-      };
-      list.appendChild(b);
-      if (i === episodeIndex) b.scrollIntoView({ block: "nearest" });
+  el("previous-episode").onclick = function () {
+    if (previous) start(previous, { queue: queue.slice() });
+  };
+  el("next-episode").onclick = function () {
+    if (next) start(next, { queue: queue.slice() });
+  };
+  el("player-subtitles").onclick = toggleSubtitles;
+  el("player-details").onclick = function () {
+    if (!current) return;
+    var p = current;
+    stop();
+    window.seriesPanel.open(p.seriesId || p.id, {
+      isSeries: !!p.seriesId,
+      seasonId: p.seasonId,
+      episodeId: p.id,
     });
-  }
+  };
   document.addEventListener("keydown", function (e) {
     var k = e.keyCode;
     if (
@@ -343,109 +371,46 @@
       return;
     e.preventDefault();
     event("key", { key: k, mode: mode });
-    if (mode === "player") {
-      if (k === 10009 || k === 27 || k === 413) {
-        stop();
-        if (window.catalogBrowser) window.catalogBrowser.restore();
-      } else if (k === 13 || k === 10252 || k === 415 || k === 19) toggle();
-      else if (k === 37 || k === 412) seek(-10000);
-      else if (k === 39 || k === 417) seek(10000);
-      else if (k === 40) {
-        subs = !subs;
-        try {
-          av.setSilentSubtitle(!subs);
-        } catch (e) {}
-        if (!subs) text("subtitle", "");
-        hud(subs ? "Tekstitys päällä" : "Tekstitys pois");
-      } else hud();
-      return;
-    }
     if (mode === "loading") {
-      if (k === 10009 || k === 27) stop();
-      return;
-    }
-    if (mode === "nav") {
-      if (k === 37 || k === 39) {
-        navIndex = (navIndex + (k === 37 ? -1 : 1) + 3) % 3;
-        paintNav();
-      } else if (k === 40 || k === 10009 || k === 27) {
-        mode = "home";
-        paintNav();
-      } else if (k === 13) {
-        mode = "home";
-        paintNav();
-        if (navIndex && window.catalogBrowser)
-          window.catalogBrowser.open(navIndex === 1 ? "browse" : "search");
+      if (k === 10009 || k === 27) {
+        stop();
+        returnToOrigin();
       }
       return;
     }
-    if (mode === "actions") {
-      if (k === 38) {
-        mode = "nav";
-        navIndex = 1;
-        el("play").classList.remove("action-selected");
-        el("restart").classList.remove("action-selected");
-        paintNav();
-      } else if (k === 40 || k === 10009 || k === 27) {
-        mode = "home";
-        render();
-      } else if (k === 37 || k === 39) {
-        actionIndex = 1 - actionIndex;
-        el("play").classList.toggle("action-selected", actionIndex === 0);
-        el("restart").classList.toggle("action-selected", actionIndex === 1);
-      } else if (k === 13) start(catalog[selected].id, actionIndex === 1);
-      return;
-    }
-    if (mode === "episodes") {
-      if (k === 10009 || k === 27 || (k === 38 && episodeIndex === 0)) {
-        mode = "home";
-        el("episodes").classList.add("hidden");
+    if (mode === "player") {
+      if (k === 10009 || k === 27 || k === 413) {
+        stop();
+        returnToOrigin();
       } else if (k === 38) {
-        episodeIndex = Math.max(0, episodeIndex - 1);
-        drawEpisodes();
-      } else if (k === 40) {
-        episodeIndex = Math.min(episodes.length - 1, episodeIndex + 1);
-        drawEpisodes();
-      } else if (k === 13 && episodes[episodeIndex])
-        start(episodes[episodeIndex].id, false);
+        action = 0;
+        paintActions();
+        hud();
+      } else if (action >= 0 && (k === 37 || k === 39)) {
+        action =
+          (action + (k === 37 ? -1 : 1) + actions().length) % actions().length;
+        paintActions();
+        hud();
+      } else if (action >= 0 && k === 13) el(actions()[action]).click();
+      else if (action >= 0 && k === 40) {
+        action = -1;
+        paintActions();
+        hud();
+      } else if (k === 13 || k === 10252 || k === 415 || k === 19) toggle();
+      else if (k === 37 || k === 412) seek(-10000);
+      else if (k === 39 || k === 417) seek(10000);
+      else if (k === 40) toggleSubtitles();
       return;
     }
-    if (k === 37 || k === 39) {
-      selected =
-        (selected + (k === 37 ? -1 : 1) + catalog.length) % catalog.length;
-      render();
-    } else if (k === 13 && catalog[selected])
-      start(catalog[selected].id, false);
-    else if (k === 38 && catalog[selected]) {
-      mode = "actions";
-      actionIndex = 0;
-      el("play").classList.add("action-selected");
-    } else if (k === 40 && catalog[selected]) showEpisodes();
-    else if (k === 10009 || k === 27) {
-      try {
-        tizen.application.getCurrentApplication().exit();
-      } catch (e) {}
-    }
+    window.homeScreen.handleKey(k);
   });
-  window.openAreenaProgram = function (id) {
-    start(id, false);
-  };
-  el("nav-home").onclick = function () {
-    mode = "home";
-    paintNav();
-  };
-  el("nav-browse").onclick = function () {
-    if (window.catalogBrowser) window.catalogBrowser.open("browse");
-  };
-  el("nav-search").onclick = function () {
-    if (window.catalogBrowser) window.catalogBrowser.open("search");
-  };
-  el("play").onclick = function () {
-    start(catalog[selected].id, false);
-  };
-  el("restart").onclick = function () {
-    start(catalog[selected].id, true);
-  };
+  window.openAreenaProgram = start;
+  window.addEventListener("librarychange", function () {
+    if (mode === "home") window.homeScreen.refresh();
+  });
+  window.addEventListener("libraryerror", function (e) {
+    notice(e.detail);
+  });
   document.addEventListener("visibilitychange", function () {
     if (document.hidden && mode === "player") {
       save();
@@ -474,19 +439,19 @@
     userAgent: navigator.userAgent,
     avplay: !!(window.webapis && webapis.avplay),
   });
-  request("/api/catalog")
-    .then(function (d) {
-      catalog = d;
-      render();
-      text("connection", "Suoraan Ylestä · Oma Areena 0.2.0");
-      event("catalog-loaded", { count: d.length });
+  window.homeScreen.show();
+  window
+    .areenaRequest("/api/catalog")
+    .then(function (items) {
+      window.homeScreen.setCatalog(items);
+      text("connection", "Suoraan Ylestä · Oma Areena 0.3.0");
+      event("catalog-loaded", { count: items.length });
+      return window.areenaLibrary.migrate(function (id) {
+        return window.areenaRequest("/api/program/" + id);
+      }).then(function() { event("library-migrated", {count:window.areenaLibrary.continuing().length}); });
     })
     .catch(function (e) {
-      text(
-        "description",
-        "Ohjelmatietoja ei saatu Ylestä. Sulje sovellus ja yritä uudelleen.",
-      );
-      text("connection", "Palvelin ei vastaa");
+      text("connection", "Ylen tiedot eivät ole saatavilla");
       notice(e.message);
     });
 })();
