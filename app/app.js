@@ -10,16 +10,21 @@
     subtitleTimer = null,
     subs = true,
     lastSave = 0,
-    seeking = false;
+    seeking = false,
+    pendingSeek = null,
+    introStart = null;
   var queue = [],
     previous = null,
     next = null,
     action = -1;
   var actionIds = [
+    "skip-intro",
     "previous-episode",
     "next-episode",
     "player-subtitles",
     "player-details",
+    "learn-intro",
+    "clear-intro",
   ];
   function el(id) {
     return document.getElementById(id);
@@ -54,13 +59,17 @@
     }, 7000);
   }
   window.omaNotice = notice;
-  function save() {
-    if (!current || seeking) return;
+  function save(force) {
+    if (!current || (seeking && (force !== true || pendingSeek === null)))
+      return;
     if (av)
       try {
         if (av.getState() === "PLAYING" || av.getState() === "PAUSED")
           clock = av.getCurrentTime();
       } catch (e) {}
+    // Back can arrive after the native clock moved but before the seek callback.
+    // Do not replace a saved resume point with the initial pre-seek clock.
+    if (seeking && clock < pendingSeek - 1000) return;
     if (clock > 0) {
       window.areenaLibrary.update(current, clock);
       lastSave = Date.now();
@@ -68,7 +77,7 @@
   }
   function stop(savePosition) {
     ++serial;
-    if (savePosition !== false) save();
+    if (savePosition !== false) save(true);
     clearTimeout(hideTimer);
     clearTimeout(subtitleTimer);
     if (av)
@@ -79,12 +88,15 @@
     text("subtitle", "");
     el("hud").classList.add("hidden");
     el("player-actions").classList.add("hidden");
+    el("intro-prompt").classList.add("hidden");
+    introStart = null;
     document.body.classList.remove("playing");
     el("home").classList.remove("hidden");
     mode = "home";
     action = -1;
     clock = 0;
     seeking = false;
+    pendingSeek = null;
     window.homeScreen.show();
   }
   function returnToOrigin() {
@@ -100,20 +112,86 @@
   }
   function actions() {
     return actionIds.filter(function (id) {
-      return !el(id).disabled;
+      return !el(id).disabled && !el(id).classList.contains("hidden");
     });
   }
+  function introRange() {
+    return (
+      current &&
+      current.seriesId &&
+      window.areenaLibrary.intro(current.seriesId)
+    );
+  }
+  function playerReady() {
+    try {
+      return (
+        mode === "player" &&
+        av &&
+        (av.getState() === "PLAYING" || av.getState() === "PAUSED")
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+  function canSkipIntro() {
+    var range = introRange();
+    return !!(
+      mode === "player" &&
+      !seeking &&
+      range &&
+      introStart === null &&
+      clock >= range.start &&
+      clock < range.end &&
+      range.end < current.duration * 1000 - 1000 &&
+      playerReady()
+    );
+  }
   function paintActions() {
+    var focused = action >= 0 ? actions()[action] : null,
+      range = introRange();
     el("previous-episode").disabled = !previous;
     el("next-episode").disabled = !next;
     el("player-subtitles").textContent = subs
       ? "Tekstitys pois"
       : "Tekstitys päälle";
+    el("skip-intro").classList.toggle("hidden", !canSkipIntro());
+    el("intro-prompt").classList.toggle(
+      "hidden",
+      !canSkipIntro() || action >= 0,
+    );
+    el("learn-intro").classList.toggle(
+      "hidden",
+      !(current && current.seriesId),
+    );
+    el("learn-intro").disabled = seeking || !playerReady();
+    el("clear-intro").disabled = !playerReady();
+    el("learn-intro").textContent =
+      introStart === null ? "Opeta tunnari" : "Tunnari päättyy tähän";
+    el("clear-intro").classList.toggle("hidden", introStart === null && !range);
+    el("clear-intro").textContent =
+      introStart === null ? "Poista tunnari" : "Peru opetus";
+    text(
+      "intro-hint",
+      introStart !== null
+        ? "Alku " +
+            fmt(introStart) +
+            " · Valitse loppu, kun tunnari päättyy. ↓ Sulje toiminnot; ← → Siirry videossa."
+        : range
+          ? "Tallennettu tunnari " +
+            fmt(range.start) +
+            "–" +
+            fmt(range.end) +
+            " · Sama asetus tämän sarjan jaksoille."
+          : current && current.seriesId
+            ? "Opeta tunnari: valitse sen alku nyt, ja loppu tunnarin päättyessä."
+            : "",
+    );
     actionIds.forEach(function (id) {
       el(id).classList.remove("action-selected");
     });
     var ids = actions();
     if (action >= 0) {
+      if (focused && ids.indexOf(focused) >= 0) action = ids.indexOf(focused);
       action = Math.min(action, ids.length - 1);
       el(ids[action]).classList.add("action-selected");
     }
@@ -156,6 +234,8 @@
     stop();
     var ticket = serial;
     queue = options.queue || [];
+    previous = null;
+    next = null;
     mode = "loading";
     notice("Avataan ohjelmaa…");
     window
@@ -205,6 +285,7 @@
             el("progress").style.width =
               Math.min(100, (ms / (p.duration * 1000)) * 100) + "%";
             if (!seeking && Date.now() - lastSave >= 5000) save();
+            paintActions();
           },
           onstreamcompleted: function () {
             if (ticket !== serial) return;
@@ -242,18 +323,23 @@
             try {
               seeking = true;
               av.play();
-              if (resume >= 10000 && resume < p.duration * 1000 - 15000)
+              if (resume >= 10000 && resume < p.duration * 1000 - 15000) {
+                pendingSeek = resume;
                 av.seekTo(
                   resume,
                   function () {
+                    if (ticket !== serial) return;
                     seeking = false;
+                    pendingSeek = null;
                   },
                   function () {
+                    if (ticket !== serial) return;
                     seeking = false;
+                    pendingSeek = null;
                     notice("Jatkaminen ei onnistunut. Ohjelma alkoi alusta.");
                   },
                 );
-              else seeking = false;
+              } else seeking = false;
               var tracks = av.getTotalTrackInfo(),
                 subtitle = tracks.filter(function (t) {
                   return t.type === "TEXT";
@@ -309,32 +395,97 @@
     }
   }
   function seek(delta) {
+    if (!playerReady() || seeking) return;
     try {
-      var dest = Math.max(
-        0,
-        Math.min(av.getDuration() - 1000, av.getCurrentTime() + delta),
+      seekTo(
+        av.getCurrentTime() + delta,
+        delta > 0 ? "+10 sekuntia" : "−10 sekuntia",
       );
-      seeking = true;
-      av.seekTo(
-        dest,
-        function () {
-          seeking = false;
-          clock = dest;
-          save();
-          hud("");
-          event("seek", { program: current.id, time: dest });
-        },
-        function (e) {
-          seeking = false;
-          notice(String(e));
-        },
-      );
-      hud(delta > 0 ? "+10 sekuntia" : "−10 sekuntia");
     } catch (e) {
-      seeking = false;
       notice(String(e));
     }
   }
+  function seekTo(destination, message) {
+    if (!playerReady() || !current || seeking) return;
+    var ticket = serial,
+      program = current.id;
+    try {
+      var dest = Math.max(0, Math.min(av.getDuration() - 1000, destination));
+      seeking = true;
+      pendingSeek = dest;
+      text("subtitle", "");
+      av.seekTo(
+        dest,
+        function () {
+          if (ticket !== serial) return;
+          seeking = false;
+          pendingSeek = null;
+          clock = dest;
+          save();
+          hud(message || "");
+          paintActions();
+          event("seek", { program: program, time: dest });
+        },
+        function (e) {
+          if (ticket !== serial) return;
+          seeking = false;
+          pendingSeek = null;
+          notice(String(e));
+          paintActions();
+        },
+      );
+      hud(message);
+      paintActions();
+    } catch (e) {
+      seeking = false;
+      pendingSeek = null;
+      notice(String(e));
+      paintActions();
+    }
+  }
+  function skipIntro() {
+    if (!canSkipIntro()) return;
+    var range = introRange();
+    action = -1;
+    seekTo(range.end, "Tunnari ohitettu");
+  }
+  el("skip-intro").onclick = skipIntro;
+  el("intro-prompt").onclick = skipIntro;
+  el("learn-intro").onclick = function () {
+    if (!playerReady() || !current || !current.seriesId || seeking) return;
+    var now = av.getCurrentTime();
+    if (introStart === null) {
+      introStart = now;
+      notice("Tunnarin alku tallennettu. Valitse loppu, kun tunnari päättyy.");
+    } else {
+      if (
+        now >= current.duration * 1000 - 1000 ||
+        !window.areenaLibrary.intro(current.seriesId, {
+          start: introStart,
+          end: now,
+        })
+      ) {
+        notice(
+          "Valitse loppu alun jälkeen. Tunnarin pituus voi olla 1–300 sekuntia.",
+        );
+        return;
+      }
+      introStart = null;
+      notice("Tunnari tallennettu tälle sarjalle.");
+    }
+    paintActions();
+  };
+  el("clear-intro").onclick = function () {
+    if (!current || !current.seriesId) return;
+    if (introStart !== null) {
+      introStart = null;
+      notice("Opetus peruttu.");
+    } else {
+      window.areenaLibrary.intro(current.seriesId, null);
+      notice("Tunnarin asetus poistettu.");
+    }
+    paintActions();
+  };
   function toggleSubtitles() {
     subs = !subs;
     try {
@@ -444,11 +595,17 @@
     .areenaRequest("/api/catalog")
     .then(function (items) {
       window.homeScreen.setCatalog(items);
-      text("connection", "Suoraan Ylestä · Oma Areena 0.3.2");
+      text("connection", "Suoraan Ylestä · Oma Areena 0.3.3");
       event("catalog-loaded", { count: items.length });
-      return window.areenaLibrary.migrate(function (id) {
-        return window.areenaRequest("/api/program/" + id);
-      }).then(function() { event("library-migrated", {count:window.areenaLibrary.continuing().length}); });
+      return window.areenaLibrary
+        .migrate(function (id) {
+          return window.areenaRequest("/api/program/" + id);
+        })
+        .then(function () {
+          event("library-migrated", {
+            count: window.areenaLibrary.continuing().length,
+          });
+        });
     })
     .catch(function (e) {
       text("connection", "Ylen tiedot eivät ole saatavilla");

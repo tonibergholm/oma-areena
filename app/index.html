@@ -91,14 +91,19 @@
       <p id="player-status"></p>
       <div class="timeline"><i id="progress"></i></div>
       <p id="time"></p>
-      <p>OK Tauko / jatka · ← → 10 s · ↓ Tekstitys · Takaisin Lopeta</p>
+      <p>OK Tauko / jatka · ← → 10 s · ↑ Toiminnot · ↓ Tekstitys · Takaisin Lopeta</p>
     </div>
     <div id="player-actions" class="hidden">
-      <button id="previous-episode">Edellinen jakso</button
+      <button id="skip-intro" class="hidden">Ohita tunnari</button
+      ><button id="previous-episode">Edellinen jakso</button
       ><button id="next-episode">Seuraava jakso</button
       ><button id="player-subtitles">Tekstitys</button
-      ><button id="player-details">Kaudet ja jaksot</button>
+      ><button id="player-details">Kaudet ja jaksot</button
+      ><button id="learn-intro">Opeta tunnari</button
+      ><button id="clear-intro" class="hidden">Poista tunnari</button>
+      <p id="intro-hint"></p>
     </div>
+    <button id="intro-prompt" class="hidden">↑ Ohita tunnari</button>
     <div id="subtitle"></div>
     <div id="notice" class="hidden"></div>
     <script src="data.js"></script>

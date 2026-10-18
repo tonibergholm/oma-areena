@@ -85,3 +85,13 @@ To mark a season, select it, press **Up**, then **Right** to **Merkitse kausi ka
 On the Samsung TV, remote bulk marking and undo passed for all 12 Pasila episodes; the watched tab computed gray, and the new action and pager stayed within the screen.
 
 `node tests/library.test.mjs` covers natural completion, newly added episodes, a 50-episode bulk action, persistent undo and preserving later playback. `node testing/verify-season-watched-tv.mjs` checks remote focus, full-season marking, undo, muted tabs and TV layout. As with the other on-TV checks, back up personal viewing state before running.
+
+### Version 0.3.3: skip series intros
+
+During playback, press **Up** and choose **Opeta tunnari** at the start of the theme. Choose **Tunnari päättyy tähän** when it ends. You can close the controls with **Down** and use the normal left/right 10-second seek while teaching. **Peru opetus** cancels without replacing an existing setting.
+
+The start/end range is saved locally for that series. When another episode reaches the range, **↑ Ohita tunnari** appears: press **Up**, then **OK**, to jump to its end. Selecting the on-screen button also skips. Pause/resume retains its usual OK shortcut. **Poista tunnari** removes the setting; teaching again replaces it. Ranges must be 1–300 seconds long, and skipping is offered only inside a valid range for the current episode. There is no automatic skipping or theme detection; the sampled Yle episodes had empty cue-point lists, and theme timing may differ between episodes or seasons.
+
+`node tests/library.test.mjs` covers per-series timing persistence, replacement, cancellation-safe validation and removal. `node testing/verify-intro-tv.mjs` checks teaching with remote keys, cancellation, a skip in another episode, pause/resume, reload persistence, clearing and layout on the TV. Temporary calibration settings and playback changes are restored from a private backup after development checks.
+
+The v0.3.3 on-device checks passed teaching and cancellation, skipping to the saved endpoint in another Pasila episode, persistence after reload, removal, pause, resume, seeking and automatic next episode. Returning immediately after a native seek also preserves the confirmed playback position.

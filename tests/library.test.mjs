@@ -104,6 +104,39 @@ test("season selection persists independently for each series", () => {
   assert.equal(b.api.season("1-100"), "1-6");
   assert.equal(b.api.season("1-101"), "1-3");
 });
+test("intro timings persist per series, can be replaced or removed, and do not leak mutable state", () => {
+  const a = library();
+  assert.equal(a.api.intro("1-100"), null);
+  a.api.intro("1-100", { start: 12000, end: 42000 });
+  a.api.intro("1-101", { start: 0, end: 25000 });
+  const b = library(a.store),
+    range = b.api.intro("1-100");
+  assert.equal(range.start, 12000);
+  assert.equal(range.end, 42000);
+  range.end = 90000;
+  assert.equal(b.api.intro("1-100").end, 42000);
+  b.api.intro("1-100", { start: 0, end: 40000 });
+  assert.equal(b.api.intro("1-101").end, 25000);
+  b.api.intro("1-100", null);
+  assert.equal(library(a.store).api.intro("1-100"), null);
+});
+test("invalid intro ranges cannot overwrite an existing setting", () => {
+  const a = library();
+  a.api.intro("1-100", { start: 0, end: 30000 });
+  for (const value of [
+    { start: -1, end: 30000 },
+    { start: 10000, end: 9000 },
+    { start: 0, end: 301000 },
+    { start: NaN, end: 30000 },
+    { start: 0, end: Infinity },
+    { start: "0", end: 30000 },
+    { start: 0, end: 500 },
+  ]) {
+    assert.equal(a.api.intro("1-100", value), null);
+    assert.equal(a.api.intro("1-100").end, 30000);
+  }
+  assert.equal(a.api.intro("bad", { start: 0, end: 30000 }), null);
+});
 test("season is watched only when every known episode is completed, including after reload", () => {
   const a = library(),
     items = [p("1-1"), p("1-2")];

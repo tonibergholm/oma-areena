@@ -12,11 +12,16 @@
     db = empty();
   }
   if (db.version !== 1) db = empty();
-  ["history", "favourites", "seasons", "seasonEpisodes", "seasonUndo"].forEach(
-    function (k) {
-      if (!db[k] || typeof db[k] !== "object") db[k] = {};
-    },
-  );
+  [
+    "history",
+    "favourites",
+    "seasons",
+    "seasonEpisodes",
+    "seasonUndo",
+    "intros",
+  ].forEach(function (k) {
+    if (!db[k] || typeof db[k] !== "object") db[k] = {};
+  });
   function changed() {
     try {
       localStorage.setItem(KEY, JSON.stringify(db));
@@ -226,6 +231,32 @@
     changed();
   }
   window.areenaLibrary = {
+    intro: function (seriesId, value) {
+      if (!/^1-\d+$/.test(seriesId || "")) return null;
+      if (value === null) {
+        delete db.intros[seriesId];
+        changed();
+        return null;
+      }
+      var range = value === undefined ? db.intros[seriesId] : value;
+      if (
+        !range ||
+        typeof range.start !== "number" ||
+        typeof range.end !== "number" ||
+        !isFinite(range.start) ||
+        !isFinite(range.end) ||
+        range.start < 0 ||
+        range.end - range.start < 1000 ||
+        range.end - range.start > 300000
+      )
+        return null;
+      range = { start: Math.round(range.start), end: Math.round(range.end) };
+      if (value !== undefined) {
+        db.intros[seriesId] = range;
+        changed();
+      }
+      return { start: range.start, end: range.end };
+    },
     rememberSeason: rememberSeason,
     seasonWatched: seasonWatched,
     markSeason: markSeason,
