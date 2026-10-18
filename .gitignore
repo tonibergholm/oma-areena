@@ -1,0 +1,13 @@
+tools/
+data/
+dist/
+__pycache__/
+
+# Signing identities and local environment
+*.p12
+*.pfx
+*.pem
+*.key
+password.txt
+.env
+.env.*
