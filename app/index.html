@@ -71,7 +71,12 @@
         <div class="series-copy">
           <p class="eyebrow">KAUDET JA JAKSOT</p>
           <h1 id="detail-title"></h1>
-          <p id="detail-description"></p>
+          <div class="description-preview">
+            <p id="detail-description"></p>
+            <button id="read-description" class="description-link hidden">
+              Lue kuvaus
+            </button>
+          </div>
         </div>
         <div class="series-actions">
           <button id="detail-favourite">☆ Suosikiksi</button>
@@ -84,14 +89,36 @@
       <p id="series-status" role="status"></p>
       <div id="season-episodes"></div>
       <div id="series-pager"></div>
-      <footer>← → Valitse kausi · ↓ Jaksot · OK Katso · Takaisin Palaa</footer>
+      <footer id="series-help">
+        ← → Valitse kausi · ↓ Jaksot · OK Katso · Takaisin Palaa
+      </footer>
+    </section>
+    <section
+      id="description-dialog"
+      class="hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="description-title"
+    >
+      <div class="description-sheet">
+        <p class="eyebrow">OHJELMAN TIEDOT</p>
+        <h1 id="description-title"></h1>
+        <div id="description-body"><p id="description-text"></p></div>
+        <div class="description-footer">
+          <button id="description-close" class="action-selected">Takaisin</button>
+          <span>↑ ↓ Vieritä · OK / Takaisin Sulje</span>
+        </div>
+      </div>
     </section>
     <div id="hud" class="hidden">
       <h2 id="playing-title"></h2>
       <p id="player-status"></p>
       <div class="timeline"><i id="progress"></i></div>
       <p id="time"></p>
-      <p>OK Tauko / jatka · ← → 10 s · ↑ Toiminnot · ↓ Tekstitys · Takaisin Lopeta</p>
+      <p>
+        OK Tauko / jatka · ← → 10 s · ↑ Toiminnot · ↓ Tekstitys · Takaisin
+        Lopeta
+      </p>
     </div>
     <div id="player-actions" class="hidden">
       <button id="skip-intro" class="hidden">Ohita tunnari</button

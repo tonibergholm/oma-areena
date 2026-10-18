@@ -7,10 +7,10 @@ async function evaluate(expression){const id=++seq;const m=await new Promise((re
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const key=k=>evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown',{keyCode:${k},which:${k},bubbles:true}));true`);
 async function until(expr,pred,timeout=30000){const start=Date.now();let v;do{v=await evaluate(`(()=>{try{return (${expr});}catch(e){return null;}})()`);if(v!==null&&pred(v))return v;await delay(400);}while(Date.now()-start<timeout);throw Error('Condition failed '+expr+' value '+JSON.stringify(v));}
-const report={version:'0.3.4',started:new Date().toISOString(),checks:[]};const pass=(name,evidence)=>{report.checks.push({name,evidence});console.log('PASS',name,JSON.stringify(evidence));};
+const report={version:'0.3.5',started:new Date().toISOString(),checks:[]};const pass=(name,evidence)=>{report.checks.push({name,evidence});console.log('PASS',name,JSON.stringify(evidence));};
 async function type(query){for(const c of query)await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(c)},keyCode:${c.toUpperCase().charCodeAt(0)},bubbles:true}));true`);}
 try{
- await until(`({cards:document.querySelectorAll('.card').length,version:pocState.version})`,v=>v.cards>=3&&v.version==='0.3.4');
+ await until(`({cards:document.querySelectorAll('.card').length,version:pocState.version})`,v=>v.cards>=3&&v.version==='0.3.5');
  await evaluate(`document.getElementById('nav-browse').click();true`);
  const cats=await until(`Array.from(document.querySelectorAll('#categories button')).map(b=>b.textContent)`,v=>v.length>5);pass('Remote navigation opens live categories',{count:cats.length,first:cats.slice(0,5)});
  await key(13);let results=await until(`Array.from(document.querySelectorAll('.browse-card')).map(b=>b.textContent)`,v=>v.length>0);pass('Category loads live results',{count:results.length,first:results[0]});

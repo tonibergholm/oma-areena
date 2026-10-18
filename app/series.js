@@ -12,6 +12,8 @@
     pager = 0,
     serial = 0,
     loadedSeason = -1,
+    descriptionOpen = false,
+    descriptionFocus = "seasons",
     PAGE = 24;
   function el(id) {
     return document.getElementById(id);
@@ -31,8 +33,35 @@
       description: info.description,
     };
   }
+  function hideDescription() {
+    descriptionOpen = false;
+    el("description-dialog").classList.add("hidden");
+  }
+  function showDescription(title, description) {
+    if (!description) return;
+    descriptionFocus = focus;
+    descriptionOpen = true;
+    el("description-title").textContent = title || "Ohjelman tiedot";
+    el("description-text").textContent = description;
+    el("description-dialog").classList.remove("hidden");
+    el("description-body").scrollTop = 0;
+  }
+  function closeDescription() {
+    hideDescription();
+    focus = descriptionFocus;
+    paint();
+  }
   function paint() {
     if (!info) return;
+    el("read-description").classList.toggle("hidden", !info.description);
+    el("read-description").classList.toggle(
+      "series-selected",
+      focus === "description" && !descriptionOpen,
+    );
+    el("series-help").textContent =
+      focus === "episodes"
+        ? "↑ ↓ Valitse jakso · ← Jakson kuvaus · OK Katso · Takaisin Palaa"
+        : "← → Valitse kausi · ↑ Toiminnot / kuvaus · ↓ Jaksot · OK Katso · Takaisin Palaa";
     el("detail-favourite").textContent = window.areenaLibrary.isFavourite(
       favourite(),
     )
@@ -208,6 +237,8 @@
     items = [];
     ++serial;
     focus = "seasons";
+    hideDescription();
+    el("read-description").classList.add("hidden");
     el("series-panel").classList.remove("hidden");
     el("detail-title").textContent = "Ladataan sarjaa…";
     el("detail-description").textContent = "";
@@ -290,6 +321,7 @@
       });
   }
   function close() {
+    hideDescription();
     active = false;
     returnPending = false;
     ++serial;
@@ -298,6 +330,7 @@
   }
   function play() {
     if (!items[selected]) return;
+    hideDescription();
     active = false;
     returnPending = true;
     ++serial;
@@ -340,6 +373,13 @@
       paint();
     }
   };
+  el("read-description").onclick = function () {
+    if (info) {
+      focus = "description";
+      showDescription(info.title, info.description);
+    }
+  };
+  el("description-close").onclick = closeDescription;
   el("season-watched").onclick = function () {
     if (
       !info ||
@@ -364,6 +404,15 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       var k = e.keyCode;
+      if (descriptionOpen) {
+        if (k === 27 || k === 10009 || k === 13) closeDescription();
+        else if (k === 38 || k === 40 || k === 37 || k === 39) {
+          el("description-body").scrollTop +=
+            (k === 38 || k === 37 ? -1 : 1) *
+            (k === 37 || k === 39 ? 500 : 220);
+        }
+        return;
+      }
       if (k === 27 || k === 10009) {
         close();
         return;
@@ -371,12 +420,19 @@
       if (!info) return;
       if (focus === "favourite") {
         if (k === 13) el("detail-favourite").click();
+        else if (k === 37 && info.description) focus = "description";
         else if (
           k === 39 &&
           !el("season-watched").disabled &&
           !el("season-watched").classList.contains("hidden")
         )
           focus = "watched";
+        else if (k === 40) focus = "seasons";
+      } else if (focus === "description") {
+        if (k === 13) {
+          showDescription(info.title, info.description);
+          return;
+        } else if (k === 39) focus = "favourite";
         else if (k === 40) focus = "seasons";
       } else if (focus === "watched") {
         if (k === 13) el("season-watched").click();
@@ -399,7 +455,13 @@
           else if (items.length) focus = "episodes";
         }
       } else if (focus === "episodes") {
-        if (k === 38) {
+        if (k === 37 && items[selected]) {
+          showDescription(
+            items[selected].episode || items[selected].title,
+            items[selected].description,
+          );
+          return;
+        } else if (k === 38) {
           if (selected % PAGE === 0) focus = "seasons";
           else selected--;
         } else if (k === 40) {
@@ -434,6 +496,7 @@
   );
   window.seriesPanel = {
     dismiss: function () {
+      hideDescription();
       active = false;
       returnPending = false;
       ++serial;

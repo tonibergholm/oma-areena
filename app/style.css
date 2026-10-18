@@ -793,3 +793,69 @@ nav .nav-selected {
 #categories button {
   margin-right: 16px;
 }
+.description-preview {
+  display: flex;
+  align-items: center;
+}
+.description-preview #detail-description {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.series-header button.description-link {
+  min-width: 140px;
+  flex-shrink: 0;
+  font-size: 19px;
+  padding: 12px;
+  margin: 0 0 0 18px;
+}
+#description-dialog {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: rgba(4, 7, 12, 0.94);
+  padding: 80px 170px;
+}
+.description-sheet {
+  display: flex;
+  flex-direction: column;
+  height: 920px;
+  background: #171e29;
+  border: 1px solid #465368;
+  border-radius: 16px;
+  padding: 46px 60px;
+}
+.description-sheet h1 {
+  flex-shrink: 0;
+  font-size: 44px;
+  line-height: 1.15;
+  max-height: 110px;
+  overflow: hidden;
+  margin: 14px 0 24px;
+}
+#description-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 30px;
+  margin-bottom: 28px;
+}
+#description-text {
+  font-size: 29px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding-bottom: 30px;
+}
+.description-footer { display:flex; align-items:center; flex-shrink:0; }
+.description-sheet > .eyebrow { flex-shrink:0; margin-bottom:0; }
+.description-footer > span {
+  font-size: 22px;
+  color: #bdc7d7;
+}

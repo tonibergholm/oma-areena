@@ -103,3 +103,11 @@ Season filters now replace parameters already embedded in Yle's source URL. Prev
 A regression test covers embedded and duplicate defaults, token preservation, independent 101-episode lists and paging. `node testing/verify-season-selection-tv.mjs` checks the real Mahdoton tapaus season 4/5 lists, switches back through the cache, plays a season 4 episode and verifies the Back return path. Personal playback state should be backed up before running it.
 
 On the actual Samsung TV, season 4 returned 16 episodes beginning with **Kääntöpuoli 1/2**, while season 5 returned 16 distinct episodes beginning with **Vauvakeikka 1/2**. Switching back retained the correct list, and selecting season 4 played its matching K4 episode.
+
+### Version 0.3.5: full descriptions
+
+The series header now shows an ellipsis for a shortened preview and a **Lue kuvaus** action. From the season tabs, press **Up**, **Left**, then **OK** to read the complete description in a large scrollable panel. Use **Up/Down** to scroll; **OK** or **Back** closes it and restores the previous selection. Clicking **Lue kuvaus** also opens the panel.
+
+From an episode row, **Left** opens that episode's full description. Closing it keeps the same episode selected. The description panel preserves line breaks and supports long text without moving the episode list or losing its page/season selection.
+
+`node testing/verify-description-tv.mjs` verifies the complete Vakooja joukossamme description, remote scrolling using a long local text fixture, screen bounds, and returning to the same series/episode focus on the actual TV. The fixture changes only displayed text during the test.
