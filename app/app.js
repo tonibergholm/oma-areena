@@ -595,7 +595,7 @@
     .areenaRequest("/api/catalog")
     .then(function (items) {
       window.homeScreen.setCatalog(items);
-      text("connection", "Suoraan Ylestä · Oma Areena 0.3.3");
+      text("connection", "Suoraan Ylestä · Oma Areena 0.3.4");
       event("catalog-loaded", { count: items.length });
       return window.areenaLibrary
         .migrate(function (id) {

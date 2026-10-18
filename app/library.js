@@ -22,6 +22,12 @@
   ].forEach(function (k) {
     if (!db[k] || typeof db[k] !== "object") db[k] = {};
   });
+  // Earlier clients could cache the default season's episode IDs under another season.
+  // Invalidate membership only; retain viewing progress, favourites and undo records.
+  if (db.seasonCatalogueVersion !== 2) {
+    db.seasonEpisodes = {};
+    db.seasonCatalogueVersion = 2;
+  }
   function changed() {
     try {
       localStorage.setItem(KEY, JSON.stringify(db));
@@ -168,7 +174,18 @@
         return /^1-\d+$/.test(id);
       });
     var key = seasonKey(seriesId, seasonId);
-    if (JSON.stringify(db.seasonEpisodes[key]) !== JSON.stringify(ids)) {
+    var repaired = false;
+    ids.forEach(function (id) {
+      var entry = db.history[id];
+      if (entry && entry.seriesId === seriesId && entry.seasonId !== seasonId) {
+        entry.seasonId = seasonId;
+        repaired = true;
+      }
+    });
+    if (
+      repaired ||
+      JSON.stringify(db.seasonEpisodes[key]) !== JSON.stringify(ids)
+    ) {
       db.seasonEpisodes[key] = ids;
       changed();
     }

@@ -151,6 +151,27 @@ test("season is watched only when every known episode is completed, including af
   a.api.rememberSeason("1-100", "1-201", []);
   assert.equal(a.api.seasonWatched("1-100", "1-201"), false);
 });
+test("old season membership is invalidated without losing watched history or favourites", () => {
+  const a = library();
+  a.api.update(p(), 65000);
+  a.api.toggle(p());
+  a.api.rememberSeason("1-100", "1-200", [p()]);
+  const old = JSON.parse(a.store.get("oma-areena-library-v1"));
+  delete old.seasonCatalogueVersion;
+  a.store.set("oma-areena-library-v1", JSON.stringify(old));
+  const b = library(a.store);
+  assert.equal(b.api.position("1-1"), 65000);
+  assert(b.api.isFavourite(p()));
+  assert.equal(
+    JSON.parse(a.store.get("oma-areena-library-v1")).history["1-1"].seasonId,
+    "1-200",
+  );
+  b.api.rememberSeason("1-100", "1-300", [p()]);
+  const fixed = JSON.parse(a.store.get("oma-areena-library-v1"));
+  assert.equal(fixed.history["1-1"].seasonId, "1-300");
+  assert.equal(fixed.seasonCatalogueVersion, 2);
+  assert.equal(fixed.seasonEpisodes["1-100:1-200"], undefined);
+});
 test("bulk season mark includes all episodes and undo restores earlier progress after reload", () => {
   const a = library(),
     items = Array.from({ length: 50 }, (_, i) => p("1-" + (i + 1)));

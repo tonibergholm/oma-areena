@@ -6,7 +6,7 @@
     cache = {},
     seeds = ["1-77998674", "1-77565920", "1-41272"];
   window.pocEvents = [];
-  window.pocState = { version: "0.3.3" };
+  window.pocState = { version: "0.3.4" };
   function downloadText(url, id) {
     return new Promise(function (resolve, reject) {
       var done = false,
@@ -145,6 +145,13 @@
     });
   }
   var categoryCache = null;
+  function withParameters(source, parameters) {
+    var url = new URL(source);
+    Object.keys(parameters).forEach(function (key) {
+      url.searchParams.set(key, parameters[key]);
+    });
+    return url.toString();
+  }
   function apiUrl(path) {
     var url =
       path.indexOf("https://") === 0
@@ -152,11 +159,13 @@
         : "https://areena.api.yle.fi" + path;
     if (!/^https:\/\/areena\.api\.yle\.fi\//.test(url))
       throw Error("Virheellinen Yle-osoite");
-    return (
-      url +
-      (url.indexOf("?") < 0 ? "?" : "&") +
-      "client=yle-areena-web&language=fi&v=10&app_id=areena-web-items&app_key=wlTs5D9OjIdeS9krPzRQR4I1PYVzoazN"
-    );
+    return withParameters(url, {
+      client: "yle-areena-web",
+      language: "fi",
+      v: 10,
+      app_id: "areena-web-items",
+      app_key: "wlTs5D9OjIdeS9krPzRQR4I1PYVzoazN",
+    });
   }
   function ui(path) {
     return json(apiUrl(path), "ui");
@@ -310,21 +319,15 @@
         return s.id === seasonId;
       })[0];
       if (!season) throw Error("Tuntematon kausi");
-      var parameters = Object.keys(season.parameters)
-        .map(function (k) {
-          return (
-            encodeURIComponent(k) +
-            "=" +
-            encodeURIComponent(season.parameters[k])
-          );
-        })
-        .join("&");
       var items = [],
         seen = {},
         offset = 0;
       function nextPage() {
         return ui(
-          info.source + "&" + parameters + "&offset=" + offset + "&limit=100",
+          withParameters(withParameters(info.source, season.parameters), {
+            offset: offset,
+            limit: 100,
+          }),
         ).then(function (d) {
           var raw = d.data || [];
           raw
@@ -420,7 +423,7 @@
         })[0];
         if (!c) throw Error("Tuntematon kategoria");
         var offset = Math.max(0, page | 0) * 12;
-        return ui(c.source + "&offset=" + offset + "&limit=12").then(
+        return ui(withParameters(c.source, { offset: offset, limit: 12 })).then(
           function (d) {
             return pageResult(d, offset);
           },

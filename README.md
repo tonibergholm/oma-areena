@@ -95,3 +95,11 @@ The start/end range is saved locally for that series. When another episode reach
 `node tests/library.test.mjs` covers per-series timing persistence, replacement, cancellation-safe validation and removal. `node testing/verify-intro-tv.mjs` checks teaching with remote keys, cancellation, a skip in another episode, pause/resume, reload persistence, clearing and layout on the TV. Temporary calibration settings and playback changes are restored from a private backup after development checks.
 
 The v0.3.3 on-device checks passed teaching and cancellation, skipping to the saved endpoint in another Pasila episode, persistence after reload, removal, pause, resume, seeking and automatic next episode. Returning immediately after a native seek also preserves the confirmed playback position.
+
+### Version 0.3.4: correct season selection
+
+Season filters now replace parameters already embedded in Yle's source URL. Previous versions appended duplicate `path.season` values, which could return the default season under multiple tabs. Pagination and API defaults are merged the same way, preserving the signed source token. Existing cached season membership is invalidated once; playback history, favourites, intro settings and bulk-action undo remain intact. Correctly loaded episode lists also repair stale season associations in existing history.
+
+A regression test covers embedded and duplicate defaults, token preservation, independent 101-episode lists and paging. `node testing/verify-season-selection-tv.mjs` checks the real Mahdoton tapaus season 4/5 lists, switches back through the cache, plays a season 4 episode and verifies the Back return path. Personal playback state should be backed up before running it.
+
+On the actual Samsung TV, season 4 returned 16 episodes beginning with **Kääntöpuoli 1/2**, while season 5 returned 16 distinct episodes beginning with **Vauvakeikka 1/2**. Switching back retained the correct list, and selecting season 4 played its matching K4 episode.

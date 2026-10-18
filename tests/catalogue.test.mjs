@@ -19,6 +19,7 @@ function adapter(respond) {
     Date,
     JSON,
     Error,
+    URL,
   };
   context.tizen = {
     DownloadRequest: function (url) {
@@ -157,7 +158,10 @@ test("series result resolves to its playable programme ID", async () => {
   assert.equal(a.calls.length, 3);
 });
 
-function seriesPage(options) {
+function seriesPage(
+  options,
+  source = "https://areena.api.yle.fi/v1/ui/content/list?token=example",
+) {
   return (
     '<script id="__NEXT_DATA__">' +
     JSON.stringify({
@@ -174,7 +178,7 @@ function seriesPage(options) {
                   {
                     type: "list",
                     source: {
-                      uri: "https://areena.api.yle.fi/v1/ui/content/list?token=example",
+                      uri: source,
                     },
                     filters: [{ options: options }],
                   },
@@ -234,4 +238,54 @@ test("previous and next episode resolve across season boundaries", async () => {
   });
   assert.equal(n.previous, "1-2");
   assert.equal(n.next, "1-4");
+});
+test("season selection replaces embedded defaults, preserves tokens and pages without duplicate parameters", async () => {
+  const options = [
+    {
+      title: "Kausi 4",
+      parameters: { "path.season": "1-40", "filter.order": "natural:asc" },
+    },
+    {
+      title: "Kausi 5",
+      parameters: { "path.season": "1-50", "filter.order": "natural:asc" },
+    },
+  ];
+  const a = adapter((url) => {
+    if (url.startsWith("https://areena.yle.fi/"))
+      return seriesPage(
+        options,
+        "https://areena.api.yle.fi/v1/ui/content/list?token=abc.def-_%2B&path.season=1-40&path.season=1-40&offset=12&limit=12&filter.order=natural:desc&client=old&language=fi",
+      );
+    const u = new URL(url);
+    for (const key of [
+      "path.season",
+      "offset",
+      "limit",
+      "filter.order",
+      "client",
+      "language",
+    ])
+      assert.equal(u.searchParams.getAll(key).length, 1, key);
+    assert.equal(u.searchParams.get("token"), "abc.def-_+");
+    assert.equal(u.searchParams.get("filter.order"), "natural:asc");
+    assert.equal(u.searchParams.get("limit"), "100");
+    const season = u.searchParams.get("path.season"),
+      offset = Number(u.searchParams.get("offset"));
+    return JSON.stringify({
+      meta: { count: 101 },
+      data: Array.from({ length: Math.min(100, 101 - offset) }, (_, i) =>
+        card("1-" + ((season === "1-40" ? 4000 : 5000) + offset + i)),
+      ),
+    });
+  });
+  const four = await a.series.episodes("1-100", "1-40"),
+    five = await a.series.episodes("1-100", "1-50");
+  assert.equal(four[0].id, "1-4000");
+  assert.equal(five[0].id, "1-5000");
+  assert.equal(five[100].id, "1-5100");
+  assert.equal(four.length, 101);
+  assert.equal(five.length, 101);
+  const cached = await a.series.episodes("1-100", "1-40");
+  assert.equal(cached[0].id, "1-4000");
+  assert.equal(a.calls.filter((u) => u.includes("/content/list")).length, 4);
 });
