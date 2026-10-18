@@ -75,3 +75,13 @@ Highlight **Oma Areena** in Samsung's Home launcher to see **Jatka katsomista**.
 The bundled background service publishes personal preview data on the TV. No server or account is used. Samsung limits preview publication to once per ten minutes, so the launcher may lag behind the in-app library. The app sends its latest history on library changes and when hidden; the service retains it locally for subsequent scheduled updates. If an existing Home shortcut does not pick up the new preview registration, remove the shortcut from Home and add it again (do not uninstall the app).
 
 Implementation follows Samsung’s [Personal Preview guide](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview/implementing-personal-preview.html) and [deep-link format](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview/implementing-public-preview.html). Run `node tests/preview.test.mjs` for preview filtering, safe deep links, empty history, service persistence, update throttling and failure handling. `node testing/verify-preview-tv.mjs` checks the real TV API publication and Samsung app-control resume path; it changes playback progress, so back up personal viewing state first. On the test TV, the service accepted three history cards and a real app-control request resumed the selected episode at its saved 30.9-second position. Launcher artwork rendering still needs a visual check on the TV.
+
+### Version 0.3.2: watched seasons
+
+Fully watched seasons use a muted gray tab with **✓ Katsottu**. Episode artwork is also muted when watched, and the season view shows the watched/total count. A season is complete only when every currently available episode in its full list is watched; newly discovered episodes make it incomplete again.
+
+To mark a season, select it, press **Up**, then **Right** to **Merkitse kausi katsotuksi**, and press **OK**. This covers every episode, including episodes beyond the current page, and removes those episodes from Continue Watching. **Peru kauden merkintä** undoes the bulk action and restores previous viewing positions, while keeping playback progress changed afterward. Naturally completed seasons can be marked unwatched. These changes persist locally across app restarts.
+
+On the Samsung TV, remote bulk marking and undo passed for all 12 Pasila episodes; the watched tab computed gray, and the new action and pager stayed within the screen.
+
+`node tests/library.test.mjs` covers natural completion, newly added episodes, a 50-episode bulk action, persistent undo and preserving later playback. `node testing/verify-season-watched-tv.mjs` checks remote focus, full-season marking, undo, muted tabs and TV layout. As with the other on-TV checks, back up personal viewing state before running.

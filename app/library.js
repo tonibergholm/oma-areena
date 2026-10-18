@@ -12,9 +12,11 @@
     db = empty();
   }
   if (db.version !== 1) db = empty();
-  ["history", "favourites", "seasons"].forEach(function (k) {
-    if (!db[k] || typeof db[k] !== "object") db[k] = {};
-  });
+  ["history", "favourites", "seasons", "seasonEpisodes", "seasonUndo"].forEach(
+    function (k) {
+      if (!db[k] || typeof db[k] !== "object") db[k] = {};
+    },
+  );
   function changed() {
     try {
       localStorage.setItem(KEY, JSON.stringify(db));
@@ -149,7 +151,95 @@
     }
     return Promise.all([worker(), worker(), worker()]);
   }
+  function seasonKey(seriesId, seasonId) {
+    return seriesId + ":" + seasonId;
+  }
+  function rememberSeason(seriesId, seasonId, items) {
+    var ids = items
+      .map(function (p) {
+        return p.id;
+      })
+      .filter(function (id) {
+        return /^1-\d+$/.test(id);
+      });
+    var key = seasonKey(seriesId, seasonId);
+    if (JSON.stringify(db.seasonEpisodes[key]) !== JSON.stringify(ids)) {
+      db.seasonEpisodes[key] = ids;
+      changed();
+    }
+  }
+  function seasonWatched(seriesId, seasonId) {
+    var ids = db.seasonEpisodes[seasonKey(seriesId, seasonId)];
+    return !!(
+      ids &&
+      ids.length &&
+      ids.every(function (id) {
+        return db.history[id] && db.history[id].completed;
+      })
+    );
+  }
+  function markSeason(seriesId, seasonId, items, completed) {
+    if (!items.length) return;
+    var key = seasonKey(seriesId, seasonId),
+      undo = db.seasonUndo[key];
+    db.seasonEpisodes[key] = items.map(function (p) {
+      return p.id;
+    });
+    if (completed) {
+      undo = { token: Date.now() + ":" + key, entries: {} };
+      items.forEach(function (p) {
+        undo.entries[p.id] = {
+          history: db.history[p.id] || null,
+          progress: localStorage.getItem("progress:" + p.id),
+        };
+        var entry = snapshot(p);
+        entry.seriesId = seriesId;
+        entry.seasonId = seasonId;
+        entry.position = entry.duration * 1000;
+        entry.completed = true;
+        entry.updatedAt = Date.now();
+        entry.seasonMark = undo.token;
+        db.history[p.id] = entry;
+        localStorage.removeItem("progress:" + p.id);
+      });
+      db.seasonUndo[key] = undo;
+    } else if (undo) {
+      Object.keys(undo.entries).forEach(function (id) {
+        // Keep playback progress changed since the bulk action.
+        if (!db.history[id] || db.history[id].seasonMark !== undo.token) return;
+        var previous = undo.entries[id];
+        if (previous.history) db.history[id] = previous.history;
+        else delete db.history[id];
+        if (previous.progress === null)
+          localStorage.removeItem("progress:" + id);
+        else localStorage.setItem("progress:" + id, previous.progress);
+      });
+      delete db.seasonUndo[key];
+    } else {
+      items.forEach(function (p) {
+        if (db.history[p.id] && db.history[p.id].completed) {
+          delete db.history[p.id];
+          localStorage.removeItem("progress:" + p.id);
+        }
+      });
+    }
+    changed();
+  }
   window.areenaLibrary = {
+    rememberSeason: rememberSeason,
+    seasonWatched: seasonWatched,
+    markSeason: markSeason,
+    seasonCanUndo: function (seriesId, seasonId) {
+      return !!db.seasonUndo[seasonKey(seriesId, seasonId)];
+    },
+    hasWatchedInSeason: function (seriesId, seasonId) {
+      return Object.keys(db.history).some(function (id) {
+        var p = db.history[id];
+        return (
+          p.completed && p.seriesId === seriesId && p.seasonId === seasonId
+        );
+      });
+    },
     update: update,
     position: position,
     continuing: continuing,

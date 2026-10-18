@@ -104,3 +104,48 @@ test("season selection persists independently for each series", () => {
   assert.equal(b.api.season("1-100"), "1-6");
   assert.equal(b.api.season("1-101"), "1-3");
 });
+test("season is watched only when every known episode is completed, including after reload", () => {
+  const a = library(),
+    items = [p("1-1"), p("1-2")];
+  assert.equal(a.api.seasonWatched("1-100", "1-200"), false);
+  a.api.rememberSeason("1-100", "1-200", items);
+  a.api.update(items[0], 1200000, true);
+  assert.equal(a.api.seasonWatched("1-100", "1-200"), false);
+  a.api.update(items[1], 1200000, true);
+  assert.equal(library(a.store).api.seasonWatched("1-100", "1-200"), true);
+  a.api.rememberSeason("1-100", "1-200", items.concat(p("1-3")));
+  assert.equal(a.api.seasonWatched("1-100", "1-200"), false);
+  a.api.rememberSeason("1-100", "1-201", []);
+  assert.equal(a.api.seasonWatched("1-100", "1-201"), false);
+});
+test("bulk season mark includes all episodes and undo restores earlier progress after reload", () => {
+  const a = library(),
+    items = Array.from({ length: 50 }, (_, i) => p("1-" + (i + 1)));
+  a.api.update(items[0], 65000);
+  a.api.update(items[1], 1200000, true);
+  a.api.markSeason("1-100", "1-200", items, true);
+  assert.equal(a.api.continuing().length, 0);
+  assert(items.every((p) => a.api.watched(p.id)));
+  assert.equal(a.api.seasonWatched("1-100", "1-200"), true);
+  assert.equal(a.api.seasonCanUndo("1-100", "1-200"), true);
+  const b = library(a.store);
+  b.api.markSeason("1-100", "1-200", items, false);
+  assert.equal(b.api.position("1-1"), 65000);
+  assert(b.api.watched("1-2"));
+  assert(!b.api.watched("1-50"));
+  assert(!b.api.seasonWatched("1-100", "1-200"));
+  assert(!b.api.seasonCanUndo("1-100", "1-200"));
+  assert(!a.store.get("oma-areena-library-v1").includes("manifest"));
+});
+test("undo preserves progress made after a bulk mark; natural completions can be marked unwatched", () => {
+  const a = library(),
+    items = [p("1-1"), p("1-2")];
+  a.api.markSeason("1-100", "1-200", items, true);
+  a.api.update(items[0], 95000);
+  a.api.markSeason("1-100", "1-200", items, false);
+  assert.equal(a.api.position("1-1"), 95000);
+  items.forEach((p) => a.api.update(p, 1200000, true));
+  a.api.markSeason("1-100", "1-200", items, false);
+  assert(items.every((p) => !a.api.watched(p.id)));
+  assert.equal(a.api.continuing().length, 0);
+});

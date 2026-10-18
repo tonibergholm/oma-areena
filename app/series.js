@@ -42,7 +42,28 @@
       "series-selected",
       focus === "favourite",
     );
+    var currentSeason = info.seasons[season],
+      library = window.areenaLibrary;
+    el("season-watched").classList.toggle("hidden", !currentSeason);
+    el("season-watched").disabled = loadedSeason !== season || !items.length;
+    el("season-watched").textContent =
+      currentSeason && library.seasonCanUndo(info.id, currentSeason.id)
+        ? "Peru kauden merkintä"
+        : currentSeason && library.seasonWatched(info.id, currentSeason.id)
+          ? "Merkitse katsomattomaksi"
+          : "Merkitse kausi katsotuksi";
+    el("season-watched").classList.toggle(
+      "series-selected",
+      focus === "watched",
+    );
     Array.prototype.forEach.call(el("season-tabs").children, function (b, i) {
+      if (info.seasons[i]) {
+        var watched = library.seasonWatched(info.id, info.seasons[i].id);
+        b.classList.toggle("watched-season", watched);
+        b.textContent =
+          info.seasons[i].title + (watched ? " · ✓ Katsottu" : "");
+        b.setAttribute("aria-label", b.textContent);
+      }
       b.classList.toggle(
         "series-selected",
         focus === "seasons" && i === season,
@@ -72,6 +93,7 @@
           play();
         });
       b.className = "episode";
+      b.classList.toggle("watched-episode", window.areenaLibrary.watched(p.id));
       b.dataset.index = index;
       b.dataset.programId = p.id;
       var img = document.createElement("img");
@@ -121,6 +143,13 @@
         " · " +
         items.length +
         " jaksoa" +
+        " · " +
+        items.filter(function (p) {
+          return window.areenaLibrary.watched(p.id);
+        }).length +
+        "/" +
+        items.length +
+        " katsottu" +
         (items.length > PAGE
           ? " · sivu " + (page + 1) + "/" + Math.ceil(items.length / PAGE)
           : "")
@@ -147,6 +176,12 @@
         if (!active || ticket !== serial) return;
         items = result;
         loadedSeason = season;
+        if (info.seasons[season])
+          window.areenaLibrary.rememberSeason(
+            info.id,
+            info.seasons[season].id,
+            items,
+          );
         var index = episodeId
           ? items.findIndex(function (p) {
               return p.id === episodeId;
@@ -180,6 +215,8 @@
     el("season-tabs").textContent = "";
     el("season-episodes").textContent = "";
     el("series-pager").textContent = "";
+    el("season-watched").classList.add("hidden");
+    el("season-watched").disabled = true;
     var ticket = serial;
     window.areenaSeries
       .info(id, options.isSeries)
@@ -217,6 +254,33 @@
             }),
           );
         loadSeason(false, options.episodeId);
+        // Reconcile older playback history for other seasons without loading untouched seasons.
+        var seriesId = info.id;
+        var pendingSeasons = info.seasons.filter(function (s, i) {
+          return (
+            i !== season &&
+            window.areenaLibrary.hasWatchedInSeason(seriesId, s.id)
+          );
+        });
+        function checkNext() {
+          if (
+            !active ||
+            !info ||
+            info.id !== seriesId ||
+            !pendingSeasons.length
+          )
+            return;
+          var s = pendingSeasons.shift();
+          window.areenaSeries
+            .episodes(seriesId, s.id)
+            .then(function (episodes) {
+              window.areenaLibrary.rememberSeason(seriesId, s.id, episodes);
+              if (active && info && info.id === seriesId) paint();
+            })
+            .catch(function () {})
+            .then(checkNext);
+        }
+        checkNext();
       })
       .catch(function (e) {
         if (active && ticket === serial) {
@@ -276,6 +340,22 @@
       paint();
     }
   };
+  el("season-watched").onclick = function () {
+    if (
+      !info ||
+      loadedSeason !== season ||
+      !items.length ||
+      !info.seasons[season]
+    )
+      return;
+    var id = info.seasons[season].id,
+      library = window.areenaLibrary;
+    var complete =
+      !library.seasonCanUndo(info.id, id) &&
+      !library.seasonWatched(info.id, id);
+    library.markSeason(info.id, id, items, complete);
+    render();
+  };
   document.addEventListener(
     "keydown",
     function (e) {
@@ -291,6 +371,16 @@
       if (!info) return;
       if (focus === "favourite") {
         if (k === 13) el("detail-favourite").click();
+        else if (
+          k === 39 &&
+          !el("season-watched").disabled &&
+          !el("season-watched").classList.contains("hidden")
+        )
+          focus = "watched";
+        else if (k === 40) focus = "seasons";
+      } else if (focus === "watched") {
+        if (k === 13) el("season-watched").click();
+        else if (k === 37) focus = "favourite";
         else if (k === 40) focus = "seasons";
       } else if (focus === "seasons") {
         if (k === 38) focus = "favourite";

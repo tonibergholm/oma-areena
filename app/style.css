@@ -645,6 +645,40 @@ nav .nav-selected {
 #season-tabs .active-season {
   background: #344659;
 }
+.series-header > .series-copy {
+  max-width: 1000px;
+}
+.series-header > .series-actions {
+  display: flex;
+  width: 610px;
+  max-width: 610px;
+}
+.series-actions button {
+  flex: 1;
+  min-width: 0;
+  max-width: 330px;
+  margin-left: 14px;
+  font-size: 21px;
+  padding: 16px 18px;
+}
+.series-actions button:disabled {
+  opacity: 0.45;
+}
+#season-tabs button.watched-season {
+  background: #1d222a;
+  color: #9299a5;
+}
+#season-tabs button.watched-season.series-selected {
+  background: #2a313c;
+  color: #c7ccd4;
+}
+#season-episodes .watched-episode img {
+  filter: grayscale(70%);
+  opacity: 0.65;
+}
+#season-episodes .watched-episode strong {
+  color: #a6adb9;
+}
 #series-status {
   font-size: 23px;
   color: #aab6c8;

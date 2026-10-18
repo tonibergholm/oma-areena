@@ -6,7 +6,7 @@
     cache = {},
     seeds = ["1-77998674", "1-77565920", "1-41272"];
   window.pocEvents = [];
-  window.pocState = { version: "0.3.1" };
+  window.pocState = { version: "0.3.2" };
   function downloadText(url, id) {
     return new Promise(function (resolve, reject) {
       var done = false,

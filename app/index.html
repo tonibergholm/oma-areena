@@ -68,12 +68,17 @@
     </section>
     <section id="series-panel" class="hidden" aria-label="Kaudet ja jaksot">
       <div class="series-header">
-        <div>
+        <div class="series-copy">
           <p class="eyebrow">KAUDET JA JAKSOT</p>
           <h1 id="detail-title"></h1>
           <p id="detail-description"></p>
         </div>
-        <button id="detail-favourite">☆ Suosikiksi</button>
+        <div class="series-actions">
+          <button id="detail-favourite">☆ Suosikiksi</button>
+          <button id="season-watched" class="hidden" disabled>
+            Merkitse kausi katsotuksi
+          </button>
+        </div>
       </div>
       <div id="season-tabs"></div>
       <p id="series-status" role="status"></p>
